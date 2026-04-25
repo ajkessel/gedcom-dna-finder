@@ -22,8 +22,10 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
+import argparse
 import os
 import re
+import sys
 from collections import deque
 
 import tkinter as tk
@@ -578,8 +580,36 @@ class DNAMatchFinderApp:
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description='GEDCOM DNA Finder GUI. '
+                    'Optionally pass a GEDCOM file path to load it on startup.'
+    )
+    parser.add_argument(
+        'gedcom', nargs='?', default=None,
+        help='Optional path to a .ged file to load automatically on startup.'
+    )
+    args = parser.parse_args()
+
     root = tk.Tk()
-    DNAMatchFinderApp(root)
+    app = DNAMatchFinderApp(root)
+
+    if args.gedcom:
+        path = os.path.abspath(os.path.expanduser(args.gedcom))
+        app.gedcom_path.set(path)
+        if os.path.isfile(path):
+            # Defer the load until after the window is mapped, so the
+            # status bar and cursor change are visible during parsing.
+            root.after(50, app._load_file)
+        else:
+            root.after(
+                50,
+                lambda p=path: messagebox.showerror(
+                    "File not found",
+                    f"GEDCOM file not found:\n{p}\n\n"
+                    "Use Browse… to choose a different file."
+                ),
+            )
+
     root.mainloop()
 
 
