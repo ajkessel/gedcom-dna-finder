@@ -77,7 +77,7 @@ can be run from anywhere.
 ### GUI
 
 ```
-python gedcom_dna_finder_gui.py
+python gedcom-dna-finder-gui.py
 ```
 
 1. Click **Browse** and select your `.ged` file.
@@ -103,23 +103,23 @@ deciding what tag-keyword filter to use.
 
 ```
 # List all _MTTAG definitions in the file (use "_" as a placeholder for the target)
-python find_nearest_dna_match.py tree.ged --list-tags _
+python gedcom-dna-finder-cli.py tree.ged --list-tags _
 
 # List every flagged individual
-python find_nearest_dna_match.py tree.ged --list-flagged _
+python gedcom-dna-finder-cli.py tree.ged --list-flagged _
 
 # Find the three nearest DNA-flagged relatives by name
-python find_nearest_dna_match.py tree.ged "Jane Doe"
+python gedcom-dna-finder-cli.py tree.ged "Jane Doe"
 
 # Find by exact INDI ID
-python find_nearest_dna_match.py tree.ged @I1234@
+python gedcom-dna-finder-cli.py tree.ged @I1234@
 
 # Restrict the tag filter to actual DNA matches only (excludes
 # "DNA Connection" or "Common DNA Ancestor" if you use those tags)
-python find_nearest_dna_match.py tree.ged "Jane Doe" --tag-keyword "DNA Match"
+python gedcom-dna-finder-cli.py tree.ged "Jane Doe" --tag-keyword "DNA Match"
 
 # Return the top 5 nearest matches with a deeper search
-python find_nearest_dna_match.py tree.ged "Jane Doe" --top 5 --max-depth 80
+python gedcom-dna-finder-cli.py tree.ged "Jane Doe" --top 5 --max-depth 80
 ```
 
 #### Full CLI options
