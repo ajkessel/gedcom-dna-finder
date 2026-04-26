@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 rm -r dist/
 pyinstaller --noconfirm ./gedcom-dna-finder-cli.py
 pyinstaller --noconfirm ./gedcom-dna-finder-gui.py
