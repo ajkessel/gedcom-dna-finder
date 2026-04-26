@@ -22,6 +22,9 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
+__version__ = "0.0.2"
+__release_date__ = "2026-04-26"
+
 import argparse
 import difflib
 import os
@@ -642,12 +645,17 @@ class DNAMatchFinderApp:
         self._show_file_window("How to use", self._resource_path('HELP.md'), markdown=True)
 
     def _show_about(self):
-        self._show_file_window("About", self._resource_path('LICENSE'), markdown=False)
+        self._show_file_window(
+            "About",
+            self._resource_path('LICENSE'),
+            markdown=False,
+            preamble=f"GEDCOM DNA Match Finder  v{__version__} ({__release_date__})\n\n",
+        )
 
-    def _show_file_window(self, title, filepath, markdown=False):
+    def _show_file_window(self, title, filepath, markdown=False, preamble=""):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                content = f.read()
+                content = preamble + f.read()
         except OSError as e:
             messagebox.showerror("File not found", f"Could not open:\n{filepath}\n\n{e}")
             return
