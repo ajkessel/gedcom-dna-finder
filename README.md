@@ -3,6 +3,11 @@
 Find the closest DNA-flagged relative to any person in a GEDCOM family
 tree. Provided as both a GUI and a command-line tool.
 
+Quick download links:
+* [Windows](https://github.com/ajkessel/gedcom-dna-finder/releases/download/latest/gedcom-dna-finder-windows.zip)
+* [Mac](https://github.com/ajkessel/gedcom-dna-finder/releases/download/latest/gedcom-dna-finder-mac.zip) (but see [security note](#security))
+* [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/download/latest/gedcom-dna-finder-linux.zip)
+
 ![Main window](docs/screenshots/main-window.png)
 
 This is an alpha release. Only one person has tested it so far--me.
@@ -88,6 +93,7 @@ can be run from anywhere.
 
 For pre-built binaries, just run the executable. 
 
+<a href="security"></a>
 ### MacOS security
 
 If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
