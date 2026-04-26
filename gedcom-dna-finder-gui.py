@@ -626,12 +626,24 @@ class DNAMatchFinderApp:
     def _setup_menu(self):
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
-        help_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Menu", menu=help_menu)
-        help_menu.add_command(label="How to use", command=self._show_how_to_use)
-        help_menu.add_command(label="About", command=self._show_about)
-        help_menu.add_separator()
-        help_menu.add_command(label="Quit", command=self.root.quit)
+
+        if sys.platform == 'darwin':
+            # macOS: items go in the application-name menu (name='apple').
+            # Quit is added automatically by the OS; we just wire Cmd+Q cleanly.
+            apple_menu = tk.Menu(menubar, name='apple')
+            menubar.add_cascade(menu=apple_menu)
+            apple_menu.add_command(label='About GEDCOM DNA Match Finder',
+                                   command=self._show_about)
+            apple_menu.add_command(label='How to use…',
+                                   command=self._show_how_to_use)
+            self.root.createcommand('::tk::mac::Quit', self.root.quit)
+        else:
+            app_menu = tk.Menu(menubar, tearoff=0)
+            menubar.add_cascade(label='Menu', menu=app_menu)
+            app_menu.add_command(label='How to use', command=self._show_how_to_use)
+            app_menu.add_command(label='About', command=self._show_about)
+            app_menu.add_separator()
+            app_menu.add_command(label='Quit', command=self.root.quit)
 
     def _resource_path(self, filename):
         """Locate a bundled resource whether running from source or PyInstaller."""
