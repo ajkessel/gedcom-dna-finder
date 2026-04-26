@@ -5,6 +5,8 @@ tree. Provided as both a GUI and a command-line tool.
 
 ![Main window](docs/screenshots/main-window.png)
 
+This is an alpha release. Only one person has tested it so far--me.
+
 ## The problem this solves
 
 Many genealogists working with autosomal DNA add unfamiliar people to
