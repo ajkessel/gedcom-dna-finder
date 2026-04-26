@@ -3,8 +3,6 @@
 Find the closest DNA-flagged relative to any person in a GEDCOM family
 tree. Provided as both a GUI and a command-line tool.
 
-![Main window](docs/screenshots/main-window.png)
-
 This is an alpha release. Only one person has tested it so far--me.
 
 ## The problem this solves
@@ -54,49 +52,7 @@ Two flag formats are recognized out of the box:
 Both substrings are configurable, so you can adapt the tool to other
 genealogy software's conventions.
 
-## Requirements
-
-The pre-built executables have no requirements.
-
-If you want to run these scripts from the source code, you will need:
-
-- Python 3.8 or newer
-- Tkinter (only for the GUI). It ships with the official Python
-  installers on Windows and macOS. On most Linux distributions it is
-  in a separate package, typically `python3-tk`.
-
-No third-party libraries; the entire tool uses only the Python
-standard library.
-
-## Installation
-
-
-Download the [latest release for your operating system](https://github.com/ajkessel/gedcom-dna-finder/releases/latest).
-
-Alternatively, to run from source:
-```
-git clone https://github.com/ajkessel/gedcom-dna-finder.git
-cd gedcom-dna-finder
-```
-
-That's the whole installation. The two scripts are independent and
-can be run from anywhere.
-
 ## Usage
-
-For pre-built binaries, just run the executable. 
-
-### MacOS security
-
-If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
-
-1. Attempt to open the app (it will fail).
-2. Open System Settings > Privacy & Security.
-3. Scroll down to the "Security" section.
-4. Click "Open Anyway" next to the notification about the blocked app.
-
-![MacOS Screenshot](docs/screenshots/open_anyway.png)
-
 
 ### GUI
 
@@ -233,18 +189,3 @@ but is not the same as a genealogical relationship coefficient.
 ## Privacy
 
 The tool runs entirely locally on your machine. Nothing is uploaded.
-Be aware, however, that your `.ged` file likely contains personal
-information about living people; do not commit your real GEDCOM to a
-public repository.
-
-## License
-
-This project is released under the BSD 2-Clause License. See the
-[`LICENSE`](LICENSE) file for the full text.
-
-## Contributing
-
-Bug reports and pull requests are welcome. If you encounter a GEDCOM
-file whose tag format is not recognized, please open an issue and
-include the relevant excerpt (with personal names redacted) so the
-parser can be extended.

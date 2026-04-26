@@ -54,6 +54,8 @@ Two flag formats are recognized out of the box:
 Both substrings are configurable, so you can adapt the tool to other
 genealogy software's conventions.
 
+Although this software was developed for this DNA use case, you could use it to find the closest path to any tag or page marker by entering that string into "tag keyword" or "page marker" rather than a DNA-specific term.
+
 ## Requirements
 
 The pre-built executables have no requirements.
@@ -88,7 +90,7 @@ For pre-built binaries, just run the executable.
 
 ### MacOS security
 
-If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. I will eventually figure out how to package this properly so this step isn't necessary, but for now, you need to follow these steps:
+If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
 
 1. Attempt to open the app (it will fail).
 2. Open System Settings > Privacy & Security.
@@ -235,7 +237,7 @@ but is not the same as a genealogical relationship coefficient.
 The tool runs entirely locally on your machine. Nothing is uploaded.
 Be aware, however, that your `.ged` file likely contains personal
 information about living people; do not commit your real GEDCOM to a
-public repository.
+public repository or create issues or provide feedback to this repository with any personal data.
 
 ## License
 

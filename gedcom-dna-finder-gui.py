@@ -23,6 +23,7 @@ on Linux you may need a python3-tk package).
 """
 
 import argparse
+import difflib
 import os
 import re
 import sys
@@ -30,6 +31,7 @@ from collections import deque
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
+import tkinter.font as tkfont
 
 
 # ===========================================================================
@@ -37,6 +39,15 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 # ===========================================================================
 
 LINE_RE = re.compile(r'^\s*(\d+)\s+(?:(@[^@]+@)\s+)?(\S+)(?:\s+(.*?))?\s*$')
+
+# Inline markdown: image (skip), link, bold, italic, code
+_INLINE_RE = re.compile(
+    r'!\[[^\]]*\]\([^)]*\)'      # image – discard, no capture groups
+    r'|\[([^\]]+)\]\([^)]+\)'    # link: g1 = display text
+    r'|\*\*(.+?)\*\*'            # bold: g2
+    r'|\*(.+?)\*'                # italic: g3
+    r'|`(.+?)`'                  # inline code: g4
+)
 
 
 def iter_records(path):
@@ -258,6 +269,7 @@ def describe(indi):
 
 class DNAMatchFinderApp:
     MAX_LIST_DISPLAY = 2000  # cap visible rows in the people list
+    FUZZY_THRESHOLD = 0.72   # minimum SequenceMatcher ratio to count as a match
 
     def __init__(self, root):
         self.root = root
@@ -281,14 +293,18 @@ class DNAMatchFinderApp:
         self.max_depth = tk.IntVar(value=50)
         self.status_text = tk.StringVar(value="No file loaded.")
 
+        self.fuzzy_search = tk.BooleanVar(value=False)
+
         self.search_text.trace_add('write', self._on_search_change)
         self.show_flagged_only.trace_add('write', self._on_search_change)
+        self.fuzzy_search.trace_add('write', self._on_search_change)
         self._search_after_id = None
 
         self._build_ui()
 
     # ---------------------------------------------------------- UI build
     def _build_ui(self):
+        self._setup_menu()
         outer = ttk.Frame(self.root, padding=8)
         outer.pack(fill='both', expand=True)
 
@@ -326,6 +342,9 @@ class DNAMatchFinderApp:
         )
         ttk.Checkbutton(
             search_frame, text="DNA-flagged only", variable=self.show_flagged_only
+        ).pack(side='left', padx=(8, 0))
+        ttk.Checkbutton(
+            search_frame, text="Fuzzy", variable=self.fuzzy_search
         ).pack(side='left', padx=(8, 0))
 
         list_frame = ttk.Frame(left)
@@ -400,6 +419,7 @@ class DNAMatchFinderApp:
         )
         if path:
             self.gedcom_path.set(path)
+            self._load_file()
 
     def _load_file(self):
         path = self.gedcom_path.get().strip()
@@ -463,15 +483,18 @@ class DNAMatchFinderApp:
             if query_tokens:
                 name_lower = indi['name'].lower()
                 id_lower = indi_id.lower()
-                # A row matches if every whitespace-separated token in the
-                # query appears somewhere in the name (in any order), OR if
-                # the full query is a substring of the INDI ID. The second
-                # arm preserves the ability to paste "@I1234@" or "I1234"
-                # into the search box and jump to that record.
-                if not (
-                    all(tok in name_lower for tok in query_tokens)
-                    or query in id_lower
-                ):
+                if self.fuzzy_search.get():
+                    name_words = name_lower.split()
+                    match = (
+                        all(self._fuzzy_token_matches(tok, name_words) for tok in query_tokens)
+                        or query in id_lower
+                    )
+                else:
+                    match = (
+                        all(tok in name_lower for tok in query_tokens)
+                        or query in id_lower
+                    )
+                if not match:
                     continue
             if shown >= self.MAX_LIST_DISPLAY:
                 truncated = True
@@ -507,6 +530,12 @@ class DNAMatchFinderApp:
                 f"{total:,} individuals, {len(self.families):,} families, "
                 f"{flagged_count} DNA-flagged.  Type to search."
             )
+
+    def _fuzzy_token_matches(self, token, name_words):
+        return any(
+            difflib.SequenceMatcher(None, token, word).ratio() >= self.FUZZY_THRESHOLD
+            for word in name_words
+        )
 
     def _find_matches(self):
         if not self.individuals:
@@ -589,6 +618,178 @@ class DNAMatchFinderApp:
         lines = [f"{tid}\t{name}" for tid, name in sorted(self.tag_records.items())]
         text.insert('1.0', '\n'.join(lines))
         text.configure(state='disabled')
+
+    # ---------------------------------------------------------- Menu
+    def _setup_menu(self):
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        help_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Menu", menu=help_menu)
+        help_menu.add_command(label="How to use", command=self._show_how_to_use)
+        help_menu.add_command(label="About", command=self._show_about)
+        help_menu.add_separator()
+        help_menu.add_command(label="Quit", command=self.root.quit)
+
+    def _resource_path(self, filename):
+        """Locate a bundled resource whether running from source or PyInstaller."""
+        if getattr(sys, 'frozen', False):
+            base = sys._MEIPASS
+        else:
+            base = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base, filename)
+
+    def _show_how_to_use(self):
+        self._show_file_window("How to use", self._resource_path('HELP.md'), markdown=True)
+
+    def _show_about(self):
+        self._show_file_window("About", self._resource_path('LICENSE'), markdown=False)
+
+    def _show_file_window(self, title, filepath, markdown=False):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except OSError as e:
+            messagebox.showerror("File not found", f"Could not open:\n{filepath}\n\n{e}")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title(title)
+        win.geometry("820x640")
+        win.minsize(500, 300)
+
+        text = scrolledtext.ScrolledText(win, wrap='word', padx=12, pady=8)
+        text.pack(fill='both', expand=True)
+
+        if markdown:
+            self._render_markdown(text, content)
+        else:
+            text.insert('1.0', content)
+
+        text.configure(state='disabled')
+        ttk.Button(win, text="Close", command=win.destroy).pack(pady=(4, 8))
+
+    def _render_markdown(self, widget, content):
+        """Render basic markdown into a tkinter Text widget using tag formatting."""
+        base = tkfont.Font(font=widget.cget('font'))
+        info = base.actual()
+        family = info['family']
+        size = abs(info['size']) or 10
+
+        widget.tag_configure('h1', font=(family, size + 7, 'bold'), spacing1=10, spacing3=5)
+        widget.tag_configure('h2', font=(family, size + 4, 'bold'), spacing1=8, spacing3=4)
+        widget.tag_configure('h3', font=(family, size + 2, 'bold'), spacing1=6, spacing3=3)
+        widget.tag_configure('bold', font=(family, size, 'bold'))
+        widget.tag_configure('italic', font=(family, size, 'italic'))
+        widget.tag_configure('code_inline', font=('Courier', size - 1), background='#f0f0f0')
+        widget.tag_configure('code_block', font=('Courier', size - 1), background='#f0f0f0',
+                              lmargin1=16, lmargin2=16, spacing1=1, spacing3=1)
+        widget.tag_configure('link', foreground='#0066cc')
+        widget.tag_configure('bullet', lmargin1=16, lmargin2=32)
+        widget.tag_configure('normal', font=(family, size))
+
+        lines = content.split('\n')
+        i = 0
+        in_code = False
+        code_acc = []
+
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.strip()
+
+            # Fenced code block toggle
+            if stripped.startswith('```'):
+                if in_code:
+                    widget.insert('end', '\n'.join(code_acc) + '\n', 'code_block')
+                    code_acc = []
+                    in_code = False
+                else:
+                    in_code = True
+                i += 1
+                continue
+
+            if in_code:
+                code_acc.append(line)
+                i += 1
+                continue
+
+            # Table separator row – skip
+            if re.match(r'^\|[\s\-:|]+\|$', stripped):
+                i += 1
+                continue
+
+            # ATX headers (up to ###)
+            hm = re.match(r'^(#{1,3})\s+(.*)', stripped)
+            if hm:
+                self._insert_inline(widget, hm.group(2), 'h' + str(len(hm.group(1))))
+                widget.insert('end', '\n')
+                i += 1
+                continue
+
+            # Horizontal rule
+            if re.match(r'^[-*_]{3,}\s*$', stripped):
+                widget.insert('end', '─' * 64 + '\n', 'normal')
+                i += 1
+                continue
+
+            # Table row
+            if stripped.startswith('|') and stripped.endswith('|'):
+                cells = [c.strip() for c in stripped[1:-1].split('|')]
+                is_header = (i + 1 < len(lines) and
+                             re.match(r'^\|[\s\-:|]+\|$', lines[i + 1].strip()))
+                self._insert_inline(widget, '  '.join(cells), 'bold' if is_header else 'normal')
+                widget.insert('end', '\n')
+                i += 1
+                continue
+
+            # Bullet list
+            bm = re.match(r'^[-*+]\s+(.*)', stripped)
+            if bm:
+                self._insert_inline(widget, '• ' + bm.group(1), 'bullet')
+                widget.insert('end', '\n')
+                i += 1
+                continue
+
+            # Numbered list
+            nm = re.match(r'^(\d+\.)\s+(.*)', stripped)
+            if nm:
+                self._insert_inline(widget, nm.group(1) + ' ' + nm.group(2), 'bullet')
+                widget.insert('end', '\n')
+                i += 1
+                continue
+
+            # Empty line
+            if not stripped:
+                widget.insert('end', '\n')
+                i += 1
+                continue
+
+            # Normal paragraph line
+            self._insert_inline(widget, line, 'normal')
+            widget.insert('end', '\n')
+            i += 1
+
+        if code_acc:
+            widget.insert('end', '\n'.join(code_acc) + '\n', 'code_block')
+
+    def _insert_inline(self, widget, text, base_tag):
+        """Insert text with inline markdown (bold, italic, code, links) into widget."""
+        pos = 0
+        for m in _INLINE_RE.finditer(text):
+            if m.start() > pos:
+                widget.insert('end', text[pos:m.start()], base_tag)
+            g1, g2, g3, g4 = m.group(1), m.group(2), m.group(3), m.group(4)
+            if g1 is not None:
+                widget.insert('end', g1, (base_tag, 'link'))
+            elif g2 is not None:
+                widget.insert('end', g2, (base_tag, 'bold'))
+            elif g3 is not None:
+                widget.insert('end', g3, (base_tag, 'italic'))
+            elif g4 is not None:
+                widget.insert('end', g4, 'code_inline')
+            # else: image – discard silently
+            pos = m.end()
+        if pos < len(text):
+            widget.insert('end', text[pos:], base_tag)
 
 
 def main():
