@@ -1,7 +1,7 @@
 # GEDCOM DNA Finder
 
 Find the closest DNA-flagged relative to any person in a GEDCOM family
-tree. Provided as both a command-line tool and a small Tkinter GUI.
+tree. Provided as both a GUI and a command-line tool.
 
 ![Main window](docs/screenshots/main-window.png)
 
@@ -54,6 +54,10 @@ genealogy software's conventions.
 
 ## Requirements
 
+The pre-built executables have no requirements.
+
+If you want to run these scripts from the source code, you will need:
+
 - Python 3.8 or newer
 - Tkinter (only for the GUI). It ships with the official Python
   installers on Windows and macOS. On most Linux distributions it is
@@ -64,6 +68,10 @@ standard library.
 
 ## Installation
 
+
+Download the [latest release for your operating system](https://github.com/ajkessel/gedcom-dna-finder/releases/latest).
+
+Alternatively, to run from source:
 ```
 git clone https://github.com/ajkessel/gedcom-dna-finder.git
 cd gedcom-dna-finder
@@ -73,6 +81,8 @@ That's the whole installation. The two scripts are independent and
 can be run from anywhere.
 
 ## Usage
+
+For pre-built binaries, just run the executable.
 
 ### GUI
 
