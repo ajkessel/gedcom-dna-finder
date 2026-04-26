@@ -22,15 +22,17 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.2"
+__version__ = "0.0.3"
 __release_date__ = "2026-04-26"
 
 import argparse
 import difflib
+import json
 import os
 import re
 import sys
 from collections import deque
+from pathlib import Path
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
@@ -273,6 +275,7 @@ def describe(indi):
 class DNAMatchFinderApp:
     MAX_LIST_DISPLAY = 2000  # cap visible rows in the people list
     FUZZY_THRESHOLD = 0.72   # minimum SequenceMatcher ratio to count as a match
+    MAX_RECENT = 10          # number of recent files to remember
 
     def __init__(self, root):
         self.root = root
@@ -303,6 +306,8 @@ class DNAMatchFinderApp:
         self.fuzzy_search.trace_add('write', self._on_search_change)
         self._search_after_id = None
 
+        self._recent_files = self._load_history()
+
         self._build_ui()
 
     # ---------------------------------------------------------- UI build
@@ -314,9 +319,11 @@ class DNAMatchFinderApp:
         # File row
         file_frame = ttk.LabelFrame(outer, text="GEDCOM file", padding=8)
         file_frame.pack(fill='x')
-        ttk.Entry(file_frame, textvariable=self.gedcom_path).pack(
-            side='left', fill='x', expand=True, padx=(0, 4)
+        self.path_combo = ttk.Combobox(
+            file_frame, textvariable=self.gedcom_path, values=self._recent_files
         )
+        self.path_combo.pack(side='left', fill='x', expand=True, padx=(0, 4))
+        self.path_combo.bind('<<ComboboxSelected>>', lambda _: self._load_file())
         ttk.Button(file_frame, text="Browse…", command=self._browse).pack(side='left', padx=2)
         ttk.Button(file_frame, text="Load", command=self._load_file).pack(side='left', padx=2)
 
@@ -416,9 +423,12 @@ class DNAMatchFinderApp:
 
     # ---------------------------------------------------------- Handlers
     def _browse(self):
+        current = self.gedcom_path.get().strip()
+        initialdir = os.path.dirname(current) if current else None
         path = filedialog.askopenfilename(
             title="Select GEDCOM file",
             filetypes=[("GEDCOM files", "*.ged *.gedcom"), ("All files", "*.*")],
+            initialdir=initialdir,
         )
         if path:
             self.gedcom_path.set(path)
@@ -453,6 +463,7 @@ class DNAMatchFinderApp:
             key=lambda iid: (self.individuals[iid]['name'].lower(), iid),
         )
         self.root.config(cursor="")
+        self._add_to_history(path)
         self._populate_tree()
 
     def _on_search_change(self, *_):
@@ -621,6 +632,35 @@ class DNAMatchFinderApp:
         lines = [f"{tid}\t{name}" for tid, name in sorted(self.tag_records.items())]
         text.insert('1.0', '\n'.join(lines))
         text.configure(state='disabled')
+
+    # ---------------------------------------------------------- History / config
+    def _config_path(self):
+        if sys.platform == 'win32':
+            base = Path(os.environ.get('APPDATA', Path.home()))
+        elif sys.platform == 'darwin':
+            base = Path.home() / 'Library' / 'Application Support'
+        else:
+            base = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+        return base / 'gedcom-dna-finder' / 'settings.json'
+
+    def _load_history(self):
+        try:
+            data = json.loads(self._config_path().read_text(encoding='utf-8'))
+            return [p for p in data.get('recent_files', []) if isinstance(p, str)]
+        except Exception:
+            return []
+
+    def _save_history(self, history):
+        cfg = self._config_path()
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(json.dumps({'recent_files': history}, indent=2), encoding='utf-8')
+
+    def _add_to_history(self, filepath):
+        history = [filepath] + [p for p in self._recent_files if p != filepath]
+        history = history[:self.MAX_RECENT]
+        self._recent_files = history
+        self.path_combo['values'] = history
+        self._save_history(history)
 
     # ---------------------------------------------------------- Menu
     def _setup_menu(self):
