@@ -1,4 +1,5 @@
 #!/bin/sh
+rm -r dist/
 pyinstaller --noconfirm ./gedcom-dna-finder-cli.py
 pyinstaller --noconfirm ./gedcom-dna-finder-gui.py
 if [[ $(uname) == "Linux" ]]
