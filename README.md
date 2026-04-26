@@ -93,7 +93,7 @@ can be run from anywhere.
 
 For pre-built binaries, just run the executable. 
 
-<a href="security"></a>
+<a href="#security"></a>
 ### MacOS security
 
 If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
