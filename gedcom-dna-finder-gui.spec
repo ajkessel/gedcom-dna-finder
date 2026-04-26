@@ -1,5 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+from PyInstaller.utils.hooks import collect_data_files
+
 
 a = Analysis(
     ['gedcom-dna-finder-gui.py'],
@@ -37,3 +40,9 @@ exe = EXE(
     entitlements_file=None,
     icon=['family_tree.ico'],
 )
+
+if sys.platform == 'darwin':
+    app = BUNDLE(exe,
+                 name='gedcom-dna-finder.app',
+                 icon='family_tree.icns',
+                 bundle_identifier='com.ajkessel.gedcom-dna-finder')
