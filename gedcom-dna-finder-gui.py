@@ -450,6 +450,7 @@ class DNAMatchFinderApp:
             return
 
         query = self.search_text.get().strip().lower()
+        query_tokens = query.split()
         flagged_only = self.show_flagged_only.get()
         flagged_count = sum(1 for i in self.individuals.values() if i['dna_markers'])
 
@@ -459,8 +460,19 @@ class DNAMatchFinderApp:
             indi = self.individuals[indi_id]
             if flagged_only and not indi['dna_markers']:
                 continue
-            if query and query not in indi['name'].lower() and query not in indi_id.lower():
-                continue
+            if query_tokens:
+                name_lower = indi['name'].lower()
+                id_lower = indi_id.lower()
+                # A row matches if every whitespace-separated token in the
+                # query appears somewhere in the name (in any order), OR if
+                # the full query is a substring of the INDI ID. The second
+                # arm preserves the ability to paste "@I1234@" or "I1234"
+                # into the search box and jump to that record.
+                if not (
+                    all(tok in name_lower for tok in query_tokens)
+                    or query in id_lower
+                ):
+                    continue
             if shown >= self.MAX_LIST_DISPLAY:
                 truncated = True
                 break
