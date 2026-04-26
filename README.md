@@ -3,7 +3,7 @@
 Find the closest DNA-flagged relative to any person in a GEDCOM family
 tree. Provided as both a GUI and a command-line tool.
 
-Quick download links:
+Downloads:
 * [Windows](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-windows.zip)
 * [Mac](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-mac.zip) (but see [security note](#macos-security))
 * [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-linux.zip)
@@ -59,7 +59,7 @@ Two flag formats are recognized out of the box:
 Both substrings are configurable, so you can adapt the tool to other
 genealogy software's conventions.
 
-Although this software was developed for this DNA use case, you could use it to find the closest path to any tag or page marker by entering that string into "tag keyword" or "page marker" rather than a DNA-specific term.
+Although this software was developed for this DNA use case, you could use it to find the closest path to any tag or page marker by entering that string into "tag keyword" or "page marker" rather than a DNA-specific term. For example, if your paternal relatives are tagged with a "paternal" tag, you could use this tool to find the path between anyone in your tree and anyone tagged as a paternal relative.
 
 ## Requirements
 
