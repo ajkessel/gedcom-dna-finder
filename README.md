@@ -84,7 +84,19 @@ can be run from anywhere.
 
 ## Usage
 
-For pre-built binaries, just run the executable.
+For pre-built binaries, just run the executable. 
+
+### MacOS security
+
+If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. I will eventually figure out how to package this properly so this step isn't necessary, but for now, you need to follow these steps:
+
+1. Attempt to open the app (it will fail).
+2. Open System Settings > Privacy & Security.
+3. Scroll down to the "Security" section.
+4. Click "Open Anyway" next to the notification about the blocked app.
+
+![MacOS Screenshot](docs/screenshots/open_anyway.png)
+
 
 ### GUI
 
