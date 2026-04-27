@@ -112,17 +112,6 @@ of 50 should find connections at least up to 4th cousins.
 
 ![Relationship window](docs/screenshots/relationship-path.png)
 
-### MacOS security
-
-If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
-
-1. Attempt to open the app (it will fail).
-2. Open System Settings > Privacy & Security.
-3. Scroll down to the "Security" section.
-4. Click "Open Anyway" next to the notification about the blocked app.
-
-![MacOS Screenshot](docs/screenshots/open_anyway.png)
-
 
 ### GUI
 
@@ -279,6 +268,18 @@ The tool runs entirely locally on your machine. Nothing is uploaded.
 Be aware, however, that your `.ged` file likely contains personal
 information about living people; do not commit your real GEDCOM to a
 public repository or create issues or provide feedback to this repository with any personal data.
+
+## MacOS security
+
+If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
+
+1. Attempt to open the app (it will fail).
+2. Open System Settings > Privacy & Security.
+3. Scroll down to the "Security" section.
+4. Click "Open Anyway" next to the notification about the blocked app.
+
+![MacOS Screenshot](docs/screenshots/open_anyway.png)
+
 
 ## License
 
