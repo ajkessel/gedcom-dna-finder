@@ -276,7 +276,7 @@ If you are on Mac and not running from the source code, you will have to tell th
 1. Attempt to open the app (it will fail).
 2. Open System Settings > Privacy & Security.
 3. Scroll down to the "Security" section.
-4. Click "Open Anyway" next to the notification about the blocked app.
+4. Click "Open Anyway" next to the notification about the blocked app. You will likely need to enter the username and password of an administrator user on the device to approve the application.
 
 ![MacOS Screenshot](docs/screenshots/open_anyway.png)
 
