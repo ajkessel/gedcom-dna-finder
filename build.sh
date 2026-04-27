@@ -43,5 +43,5 @@ pyinstaller --noconfirm ./gedcom-dna-finder-gui.spec || {
 	exit 1
 }
 pushd dist
-zip -r - . >"${out}"
+zip -r - . >"../${out}"
 popd
