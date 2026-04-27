@@ -260,6 +260,48 @@ def bfs_find_dna_matches(start_id, individuals, families, top_n, max_depth):
     return results
 
 
+def _is_spouse_detour_of(longer, shorter):
+    """Return True if `longer` is `shorter` with one or more spouse-detour nodes inserted.
+
+    A spouse detour is a node S inserted before node N (where N is reached via
+    a 'spouse' edge from S) and N already appears in the shorter path. This
+    detects e.g. [A, B, grandmother, grandfather] being redundant with
+    [A, B, grandfather] when grandmother is grandfather's spouse.
+    """
+    shorter_ids = {nid for nid, _ in shorter}
+    shorter_list = [nid for nid, _ in shorter]
+    if longer[0][0] != shorter_list[0] or longer[-1][0] != shorter_list[-1]:
+        return False
+    if len(longer) <= len(shorter):
+        return False
+    filtered = []
+    i = 0
+    while i < len(longer):
+        nid, _ = longer[i]
+        if nid in shorter_ids:
+            filtered.append(nid)
+            i += 1
+        elif (i + 1 < len(longer)
+              and longer[i + 1][1] == 'spouse'
+              and longer[i + 1][0] in shorter_ids):
+            i += 1  # skip detour node; next iteration picks up the spouse target
+        else:
+            return False
+    return filtered == shorter_list
+
+
+def _filter_spouse_detours(paths):
+    """Remove paths that are spouse-detour variants of a shorter path in the same list."""
+    if len(paths) <= 1:
+        return paths
+    paths = sorted(paths, key=len)
+    kept = [paths[0]]
+    for candidate in paths[1:]:
+        if not any(_is_spouse_detour_of(candidate, keeper) for keeper in kept):
+            kept.append(candidate)
+    return kept
+
+
 def bfs_find_all_paths(start_id, end_id, individuals, families, top_n=5, max_depth=50):
     """Find up to top_n distinct paths between start and end.
 
@@ -324,6 +366,7 @@ def bfs_find_all_paths(start_id, end_id, individuals, families, top_n=5, max_dep
             elif len(new_path) < length_limit:
                 q2.append((neighbor_id, new_path))
 
+    found = _filter_spouse_detours(found)
     return found, truncated
 
 

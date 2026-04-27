@@ -9,6 +9,7 @@ Downloads:
 * [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-linux.zip)
 
 ![Main window](docs/screenshots/main-window.png)
+![Relationship window](docs/screenshots/relationship-path.png)
 
 This is an alpha release. Only one person has tested it so far--me.
 
@@ -26,7 +27,11 @@ Ancestry, Family Tree Maker, and standard GEDCOM viewers can show you
 a flat list of everyone you've tagged as a DNA match, but none of them
 will, given an arbitrary person in the tree, walk outward through the
 relationship graph and tell you the nearest tagged relative. That is
-what this tool does.
+the main purpose of this tool.
+
+As an added bonus, you can use this tool to find multiple paths between
+any two people in your tree and also view individual records from your
+tree.
 
 ## What it does
 
