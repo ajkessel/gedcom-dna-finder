@@ -583,7 +583,11 @@ class DNAMatchFinderApp:
         self.root.title("GEDCOM DNA Match Finder")
         self.root.geometry("1100x720")
         self.root.minsize(800, 500)
-        self.root.iconbitmap(self._resource_path('family_tree.ico'))
+        if sys.platform == 'win32':
+            self.root.iconbitmap(self._resource_path('family_tree.ico'))
+        else:
+            icon = tk.PhotoImage(file=self._resource_path('family_tree.png'))
+            self.root.iconphoto(True, icon)
 
         # Data state
         self.individuals = {}
