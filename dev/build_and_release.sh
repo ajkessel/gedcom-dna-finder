@@ -2,8 +2,9 @@
 # script for building and uploading executables to Github
 # intended to run from WSL instance with access to local powershell and remote mac at hostname vmac
 # include -c as command line switch to create new release, otherwise latest release will be used
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd "${SCRIPT_DIR}/.."
 exec > >( sed 's/\x1b\[[0-9;]*m//g' | tee -a build_and_release.log) 2>&1
-cd ..
 printf -- "---------------------------------\ngedcom-dna-finder build log\n$(date)\n---------------------------------\n"
 if [ "$1" == "-c" ]
 then
@@ -19,7 +20,7 @@ ssh vmac 'cd gedcom-dna-finder/ ; git pull ; source .venv/bin/activate ; ./dev/b
 echo 'Building for Windows platform...'
 pwsh -command 'set-location c:/apps/src/gedcom-dna-finder ; git pull ; venv ; ./dev/build.ps1' 
 echo 'Copying built ZIP files locally...'
-scp vmac:gedcom-dna-finder/dist/*zip . 
-cp /mnt/c/apps/src/gedcom-dna-finder/dist/*zip . 
+scp vmac:gedcom-dna-finder/dist/*zip ./dist 
+cp /mnt/c/apps/src/gedcom-dna-finder/dist/*zip ./dist 
 echo 'Uploading new release to GitHub...'
 gh release upload "${current}" ./dist/*zip --clobber
