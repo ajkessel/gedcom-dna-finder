@@ -42,7 +42,21 @@ exe = EXE(
 )
 
 if sys.platform == 'darwin':
-    app = BUNDLE(exe,
+    exe = EXE(pyz,
+              a.scripts,
+              exclude_binaries=True, 
+              name='gedcom-dna-finder',
+              console=False)
+
+    coll = COLLECT(exe,
+                   a.binaries,
+                   a.zipfiles,
+                   a.datas,
+                   strip=False,
+                   upx=True,
+                   name='gedcom-dna-finder.app')
+
+    app = BUNDLE(coll,
                  name='gedcom-dna-finder.app',
                  icon='family_tree.icns',
                  bundle_identifier='com.ajkessel.gedcom-dna-finder')
