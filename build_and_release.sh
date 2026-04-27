@@ -3,6 +3,7 @@
 # intended to run from WSL instance with access to local powershell and remote mac at hostname vmac
 # include -c as command line switch to create new release, otherwise latest release will be used
 exec > >( sed 's/\x1b\[[0-9;]*m//g' | tee -a build_and_release.log) 2>&1
+echo 'gedcom-dna-finder build log: '$(date)
 if [ "$1" == "-c" ]
 then
    gh release create
