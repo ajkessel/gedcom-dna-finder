@@ -38,7 +38,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['./icons/family_tree.ico'],
+    icon=['family_tree.ico'],
 )
 
 if sys.platform == 'darwin':
