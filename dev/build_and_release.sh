@@ -16,7 +16,7 @@ source .venv/bin/activate
 echo 'Building for Linux platform...'
 ./dev/build.sh
 echo 'Building for Mac platform...'
-ssh vmac 'cd gedcom-dna-finder/ ; git pull ; source .venv/bin/activate ; ./dev/build.sh'
+ssh vmac 'cd gedcom-dna-finder/ ; git pull ; ./dev/build.sh'
 echo 'Building for Windows platform...'
 pwsh -command 'set-location c:/apps/src/gedcom-dna-finder ; git pull ; venv ; ./dev/build.ps1' 
 echo 'Copying built ZIP files locally...'
