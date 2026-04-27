@@ -26,6 +26,7 @@ __version__ = "0.0.5"
 __release_date__ = "2026-04-27"
 
 import argparse
+import heapq
 import ctypes
 import difflib
 import json
@@ -353,34 +354,44 @@ def bfs_find_all_paths(start_id, end_id, individuals, families, top_n=5, max_dep
                 dist_to_end[nbr] = dist + 1
                 q_rev.append((nbr, dist + 1))
 
-    # --- Phase 2: path-tracking BFS within length_limit ---
+    # --- Phase 2: A*-style path search ---
+    # Priority = g + h where g = edges used, h = dist_to_end[current].
+    # This explores paths in estimated-total-cost order, finding the shortest
+    # path in O(branching * depth) rather than the BFS O(branching^depth),
+    # which is what caused distant cousins (10+ hops) to exceed MAX_EXPLORE.
     MAX_EXPLORE = 100_000
 
     found = []
     explored = 0
     truncated = False
-    q2 = deque([(start_id, ((start_id, None),))])
+    _seq = 0  # tie-breaker so the heap never compares path tuples
 
-    while q2 and len(found) < top_n:
+    h0 = dist_to_end.get(start_id, length_limit + 1)
+    heap = [(h0, _seq, start_id, ((start_id, None),))]
+
+    while heap and len(found) < top_n:
         if explored >= MAX_EXPLORE:
             truncated = True
             break
-        current_id, path = q2.popleft()
+        _, _, current_id, path = heapq.heappop(heap)
         explored += 1
 
-        remaining = length_limit - len(path)
+        g = len(path) - 1  # edges used so far
 
         path_visited = {nid for nid, _ in path}
         for neighbor_id, edge_label in neighbors(current_id, individuals, families):
             if neighbor_id in path_visited:
                 continue
-            if dist_to_end.get(neighbor_id, length_limit + 1) > remaining:
+            h = dist_to_end.get(neighbor_id, length_limit + 1)
+            new_g = g + 1
+            if new_g + h > length_limit:
                 continue
             new_path = path + ((neighbor_id, edge_label),)
             if neighbor_id == end_id:
                 found.append(list(new_path))
-            elif len(new_path) < length_limit:
-                q2.append((neighbor_id, new_path))
+            else:
+                _seq += 1
+                heapq.heappush(heap, (new_g + h, _seq, neighbor_id, new_path))
 
     found = _filter_spouse_detours(found)
     return found, truncated
