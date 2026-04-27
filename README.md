@@ -106,6 +106,9 @@ panel, then click on "Find Relationship Path..." and select a second
 person. This tool will then show you the top three paths (if they
 exist) between those two people. You can change the number of paths
 to an arbitrary number by editing the "Top N" value in the bottom right.
+If the two people are very distantly related, you may need to increase
+the "Max Depth" setting to find the connection. The default max depth
+of 50 should find connections at least up to 4th cousins.
 
 ![Relationship window](docs/screenshots/relationship-path.png)
 
