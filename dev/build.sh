@@ -1,6 +1,5 @@
 #!/bin/bash
-[[ -d /opt/homebrew/opt/python/libexec/bin ]] && export PATH="/usr/local/opt/python/libexec/bin:$PATH"
-[[ -d /usr/local/opt/python/libexec/bin ]] && export PATH="/usr/local/opt/python/libexec/bin:$PATH"
+command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "${SCRIPT_DIR}/.."
 [[ -e dist/ ]] && rm -r dist/
