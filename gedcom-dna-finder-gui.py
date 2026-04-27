@@ -654,9 +654,9 @@ class DNAMatchFinderApp:
         self.root.geometry("1100x720")
         self.root.minsize(800, 500)
         if sys.platform == 'win32':
-            self.root.iconbitmap(self._resource_path('family_tree.ico'))
+            self.root.iconbitmap(self._resource_path('icons/family_tree.ico'))
         else:
-            icon = tk.PhotoImage(file=self._resource_path('family_tree.png'))
+            icon = tk.PhotoImage(file=self._resource_path('icons/family_tree.png'))
             self.root.iconphoto(True, icon)
 
         # Data state

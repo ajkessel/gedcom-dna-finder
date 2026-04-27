@@ -1,14 +1,32 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import glob
+import os
 import sys
 from PyInstaller.utils.hooks import collect_data_files
 
+# ffi-8.dll / libffi-8.dll is required by _ctypes.pyd on Windows but is not
+# auto-detected by PyInstaller. Conda names it ffi-8.dll (no lib prefix) and
+# places it under Library\bin; standard CPython uses libffi-8.dll in the
+# executable directory or DLLs\. Search all four combinations.
+_extra_binaries = []
+if sys.platform == 'win32':
+    _base = os.path.dirname(sys.executable)
+    for _pat in [
+        os.path.join(_base, 'libffi*.dll'),
+        os.path.join(_base, 'ffi*.dll'),
+        os.path.join(_base, 'DLLs', 'libffi*.dll'),
+        os.path.join(_base, 'DLLs', 'ffi*.dll'),
+        os.path.join(_base, 'Library', 'bin', 'libffi*.dll'),
+        os.path.join(_base, 'Library', 'bin', 'ffi*.dll'),
+    ]:
+        _extra_binaries += [(p, '.') for p in glob.glob(_pat)]
 
 a = Analysis(
     ['gedcom-dna-finder-gui.py'],
     pathex=[],
-    binaries=[],
-    datas=[('HELP.md', '.'), ('LICENSE', '.'), ('./icons/family_tree.ico','.'), ('./icons/family_tree.png','.')],
+    binaries=_extra_binaries,
+    datas=[('HELP.md', '.'), ('LICENSE', '.'), ('./icons/family_tree.ico','./icons'), ('./icons/family_tree.png','./icons')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
