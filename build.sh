@@ -10,7 +10,7 @@ if [[ $(uname) == "Linux" ]]; then
 else
 	echo 'Building for macOS...'
 	out="gedcom-dna-finder-mac.zip"
-	./generate_icns.sh -s family_tree.png || {
+	./generate_icns.sh family_tree.png || {
 		echo 'Failed to generate ICNS file.'
 		exit 1
 	}
