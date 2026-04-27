@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['gedcom-dna-finder-cli.py'],
+    ['../gedcom-dna-finder-cli.py'],
     pathex=[],
     binaries=[],
     datas=[],
