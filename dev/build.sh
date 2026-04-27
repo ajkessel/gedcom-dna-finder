@@ -1,5 +1,5 @@
 #!/bin/bash
-cd ..
+[[ -e dev/ ]] && cd ..
 [[ -e dist/ ]] && rm -r dist/
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
