@@ -8,7 +8,7 @@ a = Analysis(
     ['gedcom-dna-finder-gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('HELP.md', '.'), ('LICENSE', '.'), ('family_tree.ico','.'), ('family_tree.png','.')],
+    datas=[('HELP.md', '.'), ('LICENSE', '.'), ('./icons/family_tree.ico','.'), ('./icons/family_tree.png','.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -38,7 +38,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['family_tree.ico'],
+    icon=['./icons/family_tree.ico'],
 )
 
 if sys.platform == 'darwin':
@@ -58,5 +58,5 @@ if sys.platform == 'darwin':
 
     app = BUNDLE(coll,
                  name='gedcom-dna-finder.app',
-                 icon='family_tree.icns',
+                 icon='./icons/family_tree.icns',
                  bundle_identifier='com.ajkessel.gedcom-dna-finder')
