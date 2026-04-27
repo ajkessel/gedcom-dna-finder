@@ -2,14 +2,14 @@
 [[ -e dist/ ]] && rm -r dist/
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
-	out = gedcom-dna-finder-linux.zip
-  python .\generate_icon.py family_tree.ico || {
-    echo 'Failed to generate ICO file.'
-    exit 1
-  }
+	out="gedcom-dna-finder-linux.zip"
+	python .\generate_icon.py family_tree.ico || {
+		echo 'Failed to generate ICO file.'
+		exit 1
+	}
 else
 	echo 'Building for macOS...'
-	out = gedcom-dna-finder-mac.zip
+	out="gedcom-dna-finder-mac.zip"
 	./generate_icns.sh -s family_tree.png || {
 		echo 'Failed to generate ICNS file.'
 		exit 1
@@ -27,8 +27,8 @@ source .venv/bin/activate || {
 	exit 1
 }
 pip install -r requirements.txt || {
-  echo 'Failed to install dependencies.'
-  exit 1
+	echo 'Failed to install dependencies.'
+	exit 1
 }
 pyinstaller --noconfirm ./gedcom-dna-finder-cli.spec || {
 	echo 'pyinstaller failed to build CLI.'
