@@ -1,11 +1,13 @@
 # GEDCOM DNA Finder
 
 Find the closest DNA-flagged relative to any person in a GEDCOM family
-tree. Provided as both a GUI and a command-line tool.
+tree or find all of the paths between any two people in your tree.
+
+Available as a graphical tool as well as a command-line version.
 
 Downloads:
 * [Windows](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-windows.zip)
-* [Mac](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-mac.zip) (but see [security note](#macos-security))
+* [Mac](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-mac.zip) (see [security note](#macos-security))
 * [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-linux.zip)
 
 ![Main window](docs/screenshots/main-window.png)
