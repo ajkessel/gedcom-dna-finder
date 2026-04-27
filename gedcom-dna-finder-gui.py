@@ -336,9 +336,24 @@ def bfs_find_all_paths(start_id, end_id, individuals, families, top_n=5, max_dep
     if shortest is None:
         return [], False
 
-    # --- Phase 2: path-tracking BFS within length_limit ---
     DELTA = 4
     length_limit = min(shortest + DELTA, max_depth)
+
+    # --- Phase 1.5: reverse BFS from end_id to build a distance-to-end map ---
+    # Phase 2 uses this to prune branches that cannot reach end_id within the
+    # remaining hops, turning an undirected exhaustive search into a directed one.
+    dist_to_end = {end_id: 0}
+    q_rev = deque([(end_id, 0)])
+    while q_rev:
+        curr, dist = q_rev.popleft()
+        if dist >= length_limit:
+            continue
+        for nbr, _ in neighbors(curr, individuals, families):
+            if nbr not in dist_to_end:
+                dist_to_end[nbr] = dist + 1
+                q_rev.append((nbr, dist + 1))
+
+    # --- Phase 2: path-tracking BFS within length_limit ---
     MAX_EXPLORE = 100_000
 
     found = []
@@ -353,12 +368,13 @@ def bfs_find_all_paths(start_id, end_id, individuals, families, top_n=5, max_dep
         current_id, path = q2.popleft()
         explored += 1
 
-        if len(path) > length_limit:
-            continue
+        remaining = length_limit - len(path)
 
         path_visited = {nid for nid, _ in path}
         for neighbor_id, edge_label in neighbors(current_id, individuals, families):
             if neighbor_id in path_visited:
+                continue
+            if dist_to_end.get(neighbor_id, length_limit + 1) > remaining:
                 continue
             new_path = path + ((neighbor_id, edge_label),)
             if neighbor_id == end_id:
@@ -655,6 +671,11 @@ class DNAMatchFinderApp:
         self.fuzzy_search.trace_add('write', self._on_search_change)
         self._search_after_id = None
 
+        self.top_n.trace_add('write', self._on_settings_change)
+        self.max_depth.trace_add('write', self._on_settings_change)
+        self._settings_after_id = None
+        self._last_result = None  # {'type': 'dna_matches'|'path', 'start_id': ..., 'end_id': ...}
+
         self._recent_files = self._load_history()
 
         self._build_ui()
@@ -836,6 +857,36 @@ class DNAMatchFinderApp:
         self._add_to_history(path)
         self._populate_tree()
 
+    def _on_settings_change(self, *_):
+        if self._settings_after_id is not None:
+            self.root.after_cancel(self._settings_after_id)
+        self._settings_after_id = self.root.after(400, self._refresh_result)
+
+    def _refresh_result(self):
+        self._settings_after_id = None
+        if not self._last_result or not self.individuals:
+            return
+        try:
+            top_n = int(self.top_n.get())
+            max_depth = int(self.max_depth.get())
+        except (tk.TclError, ValueError):
+            return
+        kind = self._last_result['type']
+        start_id = self._last_result['start_id']
+        if kind == 'dna_matches':
+            results = bfs_find_dna_matches(
+                start_id, self.individuals, self.families,
+                top_n=top_n, max_depth=max_depth,
+            )
+            self._render_results(start_id, results)
+        elif kind == 'path':
+            end_id = self._last_result['end_id']
+            paths, truncated = bfs_find_all_paths(
+                start_id, end_id, self.individuals, self.families,
+                top_n=top_n, max_depth=max_depth,
+            )
+            self._render_path_results(start_id, end_id, paths, truncated)
+
     def _on_search_change(self, *_):
         # Debounce so typing doesn't refilter on every keystroke
         if self._search_after_id is not None:
@@ -898,10 +949,14 @@ class DNAMatchFinderApp:
             )
             shown += 1
 
-        # Restore selection if still present
+        # Restore selection if still present; auto-select if exactly one result
         if prev_id and self.tree.exists(prev_id):
             self.tree.selection_set(prev_id)
             self.tree.see(prev_id)
+        elif shown == 1 and (query or flagged_only):
+            only = self.tree.get_children()[0]
+            self.tree.selection_set(only)
+            self.tree.see(only)
 
         # Status
         total = len(self.individuals)
@@ -946,6 +1001,7 @@ class DNAMatchFinderApp:
             start_id, self.individuals, self.families,
             top_n=top_n, max_depth=max_depth,
         )
+        self._last_result = {'type': 'dna_matches', 'start_id': start_id}
         self._render_results(start_id, results)
 
     def _show_person(self):
@@ -1174,6 +1230,7 @@ class DNAMatchFinderApp:
             start_id, target_id, self.individuals, self.families,
             top_n=top_n, max_depth=max_depth,
         )
+        self._last_result = {'type': 'path', 'start_id': start_id, 'end_id': target_id}
         self._render_path_results(start_id, target_id, paths, truncated)
 
     def _render_path_results(self, start_id, end_id, paths, truncated=False):
