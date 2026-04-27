@@ -1,4 +1,4 @@
-Set-Location -Path $PSScriptRoot
+Set-Location -Path $PSScriptRoot/..
 if ( -not ( Get-Command python -ErrorAction SilentlyContinue ) ) { 
     Write-Output "Python is not installed or not in the PATH. Please install Python and ensure it is in the PATH before running this script." 
     exit 1
@@ -17,6 +17,6 @@ if ( -not ( Test-Path .\venv\scripts\activate.ps1)) {
 & ".\venv\Scripts\activate.ps1"
 Remove-Item -Recurse -Force -Path dist\
 python .\generate_icon.py .\icons\family_tree.png
-pyinstaller --noconfirm .\gedcom-dna-finder-gui.spec
-pyinstaller --noconfirm .\gedcom-dna-finder-cli.spec
-Compress-Archive -Path dist\* -DestinationPath .\gedcom-dna-finder-windows.zip -Force
+pyinstaller --noconfirm .\dev\gedcom-dna-finder-gui.spec
+pyinstaller --noconfirm .\dev\gedcom-dna-finder-cli.spec
+Compress-Archive -Path dist\* -DestinationPath .\dist\gedcom-dna-finder-windows.zip -Force

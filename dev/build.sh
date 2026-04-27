@@ -1,16 +1,17 @@
 #!/bin/bash
+cd ..
 [[ -e dist/ ]] && rm -r dist/
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
-	out="gedcom-dna-finder-linux.zip"
-	python ./generate_icon.py ./icons/family_tree.png || {
+	out="dist/gedcom-dna-finder-linux.zip"
+	python ./dev/generate_icon.py ./icons/family_tree.png || {
 		echo 'Failed to generate ICO file.'
 		exit 1
 	}
 else
 	echo 'Building for macOS...'
 	out="gedcom-dna-finder-mac.zip"
-	./generate_icns.sh ./icons/family_tree.png || {
+	./dev/generate_icns.sh ./icons/family_tree.png || {
 		echo 'Failed to generate ICNS file.'
 		exit 1
 	}
@@ -30,11 +31,11 @@ pip install -r requirements.txt || {
 	echo 'Failed to install dependencies.'
 	exit 1
 }
-pyinstaller --noconfirm ./gedcom-dna-finder-cli.spec || {
+pyinstaller --noconfirm ./dev/gedcom-dna-finder-cli.spec || {
 	echo 'pyinstaller failed to build CLI.'
 	exit 1
 }
-pyinstaller --noconfirm ./gedcom-dna-finder-gui.spec || {
+pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
 	echo 'pyinstaller failed to build GUI.'
 	exit 1
 }
@@ -44,4 +45,5 @@ pyinstaller --noconfirm ./gedcom-dna-finder-gui.spec || {
 }
 pushd dist
 zip -r - . >"../${out}"
+mv "../${out}" .
 popd
