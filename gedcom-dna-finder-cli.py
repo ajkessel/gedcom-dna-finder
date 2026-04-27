@@ -195,7 +195,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
                                 else:
                                     indi['death_year'] = year
                             break
-                elif tag == 'PAGE' and page_marker_l in value.lower():
+                elif tag == 'PAGE' and page_marker_l and page_marker_l in value.lower():
                     indi['dna_markers'].append(
                         f'Source citation PAGE: "{value.strip()}"'
                     )

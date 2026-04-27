@@ -1,0 +1,6 @@
+.claude/
+.venv/
+venv/
+build/
+dist/
+*.zip

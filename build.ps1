@@ -1,4 +1,21 @@
-remove-item -recurse -force -path dist\
+Set-Location -Path $PSScriptRoot
+if ( -not ( Get-Command python -ErrorAction SilentlyContinue ) ) { 
+    Write-Output "Python is not installed or not in the PATH. Please install Python and ensure it is in the PATH before running this script." 
+    exit 1
+}
+if ( -not ( Test-Path .\venv\scripts\activate.ps1)) {
+    Write-Output "Creating and activating virtual environment, and installing dependencies..."
+    python -m venv .\venv
+    .\venv\Scripts\activate.ps1
+    pip install -r .\requirements-windows.txt
+}
+if ( -not ( Test-Path .\venv\scripts\activate.ps1)) {
+    Write-Output "Virtual environment activation script not found. Please ensure the virtual environment is set up correctly." 
+    exit 1
+}
+& ".\venv\Scripts\activate.ps1"
+Remove-Item -Recurse -Force -Path dist\
+python .\generate_icon.py family_tree.ico
 pyinstaller --noconfirm .\gedcom-dna-finder-gui.spec
 pyinstaller --noconfirm .\gedcom-dna-finder-cli.spec
-compress-archive -path dist\* -destinationpath .\gedcom-dna-finder-windows.zip -force
+Compress-Archive -Path dist\* -DestinationPath .\gedcom-dna-finder-windows.zip -Force

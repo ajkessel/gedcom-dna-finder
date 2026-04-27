@@ -22,10 +22,11 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 __release_date__ = "2026-04-27"
 
 import argparse
+import ctypes
 import difflib
 import json
 import os
@@ -121,6 +122,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
                 'birth_year': None,
                 'death_year': None,
                 '_mttag_refs': [],
+                '_raw': rec,
             }
             n = len(rec)
             for i, (level, _xref, tag, value) in enumerate(rec):
@@ -258,6 +260,73 @@ def bfs_find_dna_matches(start_id, individuals, families, top_n, max_depth):
     return results
 
 
+def bfs_find_all_paths(start_id, end_id, individuals, families, top_n=5, max_depth=50):
+    """Find up to top_n distinct paths between start and end.
+
+    Phase 1: standard BFS (O(V+E)) to find the shortest distance.
+    Phase 2: path-tracking BFS to collect all simple paths up to
+             shortest_distance + 4 edges (or max_depth), whichever is smaller.
+
+    Returns (paths, truncated) where paths is a list of path lists and
+    truncated is True when the exploration cap was hit before finishing.
+    """
+    if start_id not in individuals or end_id not in individuals:
+        return [], False
+    if start_id == end_id:
+        return [[(start_id, None)]], False
+
+    # --- Phase 1: find shortest distance ---
+    seen = {start_id}
+    q1 = deque([(start_id, 0)])
+    shortest = None
+    while q1 and shortest is None:
+        curr, dist = q1.popleft()
+        if dist >= max_depth:
+            continue
+        for nbr, _ in neighbors(curr, individuals, families):
+            if nbr == end_id:
+                shortest = dist + 1
+                break
+            if nbr not in seen:
+                seen.add(nbr)
+                q1.append((nbr, dist + 1))
+
+    if shortest is None:
+        return [], False
+
+    # --- Phase 2: path-tracking BFS within length_limit ---
+    DELTA = 4
+    length_limit = min(shortest + DELTA, max_depth)
+    MAX_EXPLORE = 100_000
+
+    found = []
+    explored = 0
+    truncated = False
+    q2 = deque([(start_id, ((start_id, None),))])
+
+    while q2 and len(found) < top_n:
+        if explored >= MAX_EXPLORE:
+            truncated = True
+            break
+        current_id, path = q2.popleft()
+        explored += 1
+
+        if len(path) > length_limit:
+            continue
+
+        path_visited = {nid for nid, _ in path}
+        for neighbor_id, edge_label in neighbors(current_id, individuals, families):
+            if neighbor_id in path_visited:
+                continue
+            new_path = path + ((neighbor_id, edge_label),)
+            if neighbor_id == end_id:
+                found.append(list(new_path))
+            elif len(new_path) < length_limit:
+                q2.append((neighbor_id, new_path))
+
+    return found, truncated
+
+
 def lifespan(indi):
     b, d = indi.get('birth_year'), indi.get('death_year')
     if b and d:
@@ -273,6 +342,206 @@ def describe(indi):
     name = indi['name'] or '(unknown)'
     span = lifespan(indi)
     return f'{name} ({span}) [{indi["id"]}]' if span else f'{name} [{indi["id"]}]'
+
+
+# ---------------------------------------------------------------------------
+# Relationship narrative helpers
+# ---------------------------------------------------------------------------
+
+def _edge_to_term(edge, sex):
+    """Single edge + target sex → plain-English word."""
+    if edge in ('father', 'mother'):
+        return edge
+    if edge == 'sibling':
+        return 'brother' if sex == 'M' else ('sister' if sex == 'F' else 'sibling')
+    if edge == 'child':
+        return 'son' if sex == 'M' else ('daughter' if sex == 'F' else 'child')
+    if edge == 'spouse':
+        return 'husband' if sex == 'M' else ('wife' if sex == 'F' else 'spouse')
+    return edge
+
+
+_ORDINALS = ['', 'first', 'second', 'third', 'fourth', 'fifth',
+             'sixth', 'seventh', 'eighth', 'ninth', 'tenth']
+_REMOVALS = {1: 'once', 2: 'twice', 3: 'three times', 4: 'four times', 5: 'five times'}
+
+
+def get_ancestor_depths(start_id, individuals, families):
+    """BFS over father/mother edges only → {ancestor_id: depth from start}."""
+    depths = {}
+    queue = deque([(start_id, 0)])
+    visited = {start_id}
+    while queue:
+        current_id, depth = queue.popleft()
+        indi = individuals.get(current_id)
+        if not indi:
+            continue
+        for fam_id in indi['famc']:
+            fam = families.get(fam_id)
+            if not fam:
+                continue
+            for parent_id in (fam['husb'], fam['wife']):
+                if parent_id and parent_id not in visited:
+                    visited.add(parent_id)
+                    depths[parent_id] = depth + 1
+                    queue.append((parent_id, depth + 1))
+    return depths
+
+
+def get_descendant_depths(start_id, individuals, families):
+    """BFS over child edges only → {descendant_id: depth from start}."""
+    depths = {}
+    queue = deque([(start_id, 0)])
+    visited = {start_id}
+    while queue:
+        current_id, depth = queue.popleft()
+        indi = individuals.get(current_id)
+        if not indi:
+            continue
+        for fam_id in indi['fams']:
+            fam = families.get(fam_id)
+            if not fam:
+                continue
+            for child_id in fam['chil']:
+                if child_id and child_id not in visited:
+                    visited.add(child_id)
+                    depths[child_id] = depth + 1
+                    queue.append((child_id, depth + 1))
+    return depths
+
+
+def describe_relationship(path, individuals, ancestors=None, descendants=None):
+    """Return a plain-English relationship from path[0] to path[-1].
+
+    Recognises ancestors, descendants, siblings, spouses, cousins (all degrees
+    and removals), aunts/uncles, nieces/nephews, in-laws, and step-relations.
+    Falls back to a possessive chain (e.g. "father's brother's son") for paths
+    that don't fit a standard pattern.
+
+    ancestors  — optional dict {indi_id: depth} of biological ancestors of
+                 path[0], computed by get_ancestor_depths().  When provided,
+                 a target who is a known ancestor is always labelled by the
+                 direct ancestor term, even if the current path reaches them
+                 via a spouse edge (which would otherwise produce "step-X").
+    descendants — same idea for biological descendants.
+    """
+    if len(path) <= 1:
+        return 'same person'
+
+    edges = [e for _, e in path[1:]]
+    sexes = [individuals.get(nid, {}).get('sex', '') for nid, _ in path]
+    target_sex = sexes[-1]
+    up_set = {'father', 'mother'}
+
+    def chain():
+        return "'s ".join(_edge_to_term(edges[i], sexes[i + 1]) for i in range(len(edges)))
+
+    def ancestor_term(n, sex):
+        if n == 1:
+            return 'father' if sex == 'M' else ('mother' if sex == 'F' else 'parent')
+        gp = 'grandfather' if sex == 'M' else ('grandmother' if sex == 'F' else 'grandparent')
+        return 'great-' * (n - 2) + gp
+
+    def descendant_term(n, sex):
+        if n == 1:
+            return 'son' if sex == 'M' else ('daughter' if sex == 'F' else 'child')
+        gc = 'grandson' if sex == 'M' else ('granddaughter' if sex == 'F' else 'grandchild')
+        return 'great-' * (n - 2) + gc
+
+    # If the target is a known biological ancestor/descendant, use the direct
+    # label regardless of the (possibly indirect) path being examined.  This
+    # prevents an alternate route through a spouse edge from producing a
+    # spurious "step-" prefix (e.g. me→mother→grandmother→grandfather should
+    # still read "grandfather", not "step-grandfather").
+    target_id = path[-1][0]
+    if ancestors and target_id in ancestors:
+        return ancestor_term(ancestors[target_id], target_sex)
+    if descendants and target_id in descendants:
+        return descendant_term(descendants[target_id], target_sex)
+
+    # Pure ancestor (all father/mother edges)
+    if all(e in up_set for e in edges):
+        return ancestor_term(len(edges), target_sex)
+
+    # Pure descendant (all child edges)
+    if all(e == 'child' for e in edges):
+        return descendant_term(len(edges), target_sex)
+
+    # Single edge (sibling, spouse, etc.)
+    if len(edges) == 1:
+        return _edge_to_term(edges[0], target_sex)
+
+    # Strip exactly one leading or one trailing spouse; anything else → chain
+    inner = list(edges)
+    lead_sp = trail_sp = 0
+    while inner and inner[0] == 'spouse':
+        lead_sp += 1
+        inner.pop(0)
+    while inner and inner[-1] == 'spouse':
+        trail_sp += 1
+        inner.pop()
+    if not inner or lead_sp > 1 or trail_sp > 1 or (lead_sp and trail_sp):
+        return chain()
+
+    # Validate inner: all-up → optional single sibling → all-down
+    state = 'up'
+    u = d = s = 0
+    valid = True
+    for e in inner:
+        if state == 'up':
+            if e in up_set:
+                u += 1
+            elif e == 'sibling':
+                s += 1
+                state = 'down'
+            elif e == 'child':
+                d += 1
+                state = 'down'
+            else:
+                valid = False
+                break
+        elif state == 'down':
+            if e == 'child':
+                d += 1
+            else:
+                valid = False
+                break
+    if not valid:
+        return chain()
+
+    u_eff = u + s
+    d_eff = d + s
+
+    # Inner is all-up: spouse + ancestors → in-law; ancestors + spouse → step-
+    if d_eff == 0:
+        return (ancestor_term(u, target_sex) + '-in-law' if lead_sp
+                else 'step-' + ancestor_term(u, target_sex))
+
+    # Inner is all-down: descendants + spouse → in-law; spouse + descendants → step-
+    if u_eff == 0:
+        return (descendant_term(d, target_sex) + '-in-law' if trail_sp
+                else 'step-' + descendant_term(d, target_sex))
+
+    # Cousin-type: compute degree and number of removals
+    cn = min(u_eff, d_eff) - 1
+    rem = abs(u_eff - d_eff)
+    more_desc = d_eff > u_eff   # target is further from the common ancestor
+
+    if cn == 0 and rem == 0:
+        core = 'brother' if target_sex == 'M' else ('sister' if target_sex == 'F' else 'sibling')
+    elif cn == 0:
+        if more_desc:
+            core = 'nephew' if target_sex == 'M' else ('niece' if target_sex == 'F' else 'niece/nephew')
+        else:
+            core = 'uncle' if target_sex == 'M' else ('aunt' if target_sex == 'F' else 'uncle/aunt')
+        if rem > 1:
+            core = 'great-' * (rem - 1) + core
+    else:
+        n_str = _ORDINALS[cn] if cn < len(_ORDINALS) else f'{cn}th'
+        r_str = _REMOVALS.get(rem, f'{rem} times')
+        core = f'{n_str} cousin' + (f' {r_str} removed' if rem else '')
+
+    return core + '-in-law' if (lead_sp or trail_sp) else core
 
 
 # ===========================================================================
@@ -314,6 +583,7 @@ class DNAMatchFinderApp:
         self.root.title("GEDCOM DNA Match Finder")
         self.root.geometry("1100x720")
         self.root.minsize(800, 500)
+        self.root.iconbitmap(self._resource_path('family_tree.ico'))
 
         # Data state
         self.individuals = {}
@@ -367,6 +637,7 @@ class DNAMatchFinderApp:
         ttk.Label(settings_frame, text="Page marker:").grid(row=0, column=2, sticky='w', padx=(0, 4))
         ttk.Entry(settings_frame, textvariable=self.page_marker, width=30).grid(row=0, column=3, padx=(0, 16))
         ttk.Button(settings_frame, text="View tag definitions…", command=self._view_tags).grid(row=0, column=4, padx=4)
+        ttk.Button(settings_frame, text="Find Relationship Path…", command=self._find_path).grid(row=0, column=5, padx=(12, 4))
 
         # Main paned area
         paned = ttk.PanedWindow(outer, orient='horizontal')
@@ -432,6 +703,9 @@ class DNAMatchFinderApp:
         ttk.Button(
             action_frame, text="Find Nearest DNA Matches", command=self._find_matches
         ).pack(side='right')
+        ttk.Button(
+            action_frame, text="Show Person", command=self._show_person
+        ).pack(side='right', padx=(0, 6))
 
         # --- Right pane: results ---
         right = ttk.Frame(paned)
@@ -627,6 +901,42 @@ class DNAMatchFinderApp:
         )
         self._render_results(start_id, results)
 
+    def _show_person(self):
+        if not self.individuals:
+            messagebox.showwarning("No data", "Load a GEDCOM file first.")
+            return
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showwarning("No selection", "Select a person from the list first.")
+            return
+        indi_id = sel[0]
+        indi = self.individuals[indi_id]
+
+        win = tk.Toplevel(self.root)
+        win.title(f"GEDCOM Record: {indi['name'] or indi_id}")
+        win.geometry("700x520")
+        win.minsize(400, 300)
+
+        text = scrolledtext.ScrolledText(win, font=('Courier', 10), wrap='none', padx=8, pady=8)
+        text.pack(fill='both', expand=True)
+
+        lines = []
+        for level, xref, tag, value in indi.get('_raw', []):
+            parts = [str(level)]
+            if xref:
+                parts.append(xref)
+            parts.append(tag)
+            if value:
+                parts.append(value)
+            lines.append(' '.join(parts))
+
+        text.insert('1.0', '\n'.join(lines))
+        text.configure(state='disabled')
+
+        btn_frame = ttk.Frame(win)
+        btn_frame.pack(fill='x', pady=(4, 8))
+        ttk.Button(btn_frame, text="Close", command=win.destroy).pack(side='right', padx=8)
+
     def _render_results(self, start_id, results):
         start = self.individuals[start_id]
         lines = []
@@ -688,9 +998,183 @@ class DNAMatchFinderApp:
         text.insert('1.0', '\n'.join(lines))
         text.configure(state='disabled')
 
+    def _pick_person(self, title="Select a Person"):
+        """Modal dialog to pick one person from the loaded GEDCOM. Returns indi_id or None."""
+        if not self.individuals:
+            messagebox.showwarning("No data", "Load a GEDCOM file first.")
+            return None
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        dw, dh = 600, 500
+        self.root.update_idletasks()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        x = px + (pw - dw) // 2
+        y = py + (ph - dh) // 2
+        dialog.geometry(f"{dw}x{dh}+{x}+{y}")
+
+        result = [None]
+
+        search_frame = ttk.Frame(dialog, padding=8)
+        search_frame.pack(fill='x')
+        ttk.Label(search_frame, text="Search:").pack(side='left', padx=(0, 4))
+        search_var = tk.StringVar()
+        ttk.Entry(search_frame, textvariable=search_var).pack(side='left', fill='x', expand=True)
+
+        list_frame = ttk.Frame(dialog, padding=(8, 0, 8, 0))
+        list_frame.pack(fill='both', expand=True)
+
+        picker_tree = ttk.Treeview(
+            list_frame,
+            columns=('name', 'years', 'flagged', 'id'),
+            show='headings',
+            selectmode='browse',
+        )
+        picker_tree.heading('name', text='Name')
+        picker_tree.heading('years', text='Years')
+        picker_tree.heading('flagged', text='DNA?')
+        picker_tree.heading('id', text='ID')
+        picker_tree.column('name', width=260, anchor='w', stretch=True)
+        picker_tree.column('years', width=80, anchor='w', stretch=False)
+        picker_tree.column('flagged', width=50, anchor='center', stretch=False)
+        picker_tree.column('id', width=90, anchor='w', stretch=False)
+        picker_tree.tag_configure('flagged_row', background='#fff4cc')
+
+        ysb = ttk.Scrollbar(list_frame, orient='vertical', command=picker_tree.yview)
+        picker_tree.configure(yscrollcommand=ysb.set)
+        picker_tree.pack(side='left', fill='both', expand=True)
+        ysb.pack(side='right', fill='y')
+
+        after_id = [None]
+
+        def populate(query=''):
+            picker_tree.delete(*picker_tree.get_children())
+            query_l = query.strip().lower()
+            query_tokens = query_l.split()
+            shown = 0
+            for indi_id in self.sorted_ids:
+                indi = self.individuals[indi_id]
+                if query_tokens:
+                    all_names = indi['alt_names'] or [indi['name']]
+                    if not (
+                        any(all(tok in name.lower() for tok in query_tokens) for name in all_names)
+                        or query_l in indi_id.lower()
+                    ):
+                        continue
+                tags = ('flagged_row',) if indi['dna_markers'] else ()
+                flagged_mark = '✓' if indi['dna_markers'] else ''
+                picker_tree.insert(
+                    '', 'end', iid=indi_id,
+                    values=(indi['name'] or '(unknown)', lifespan(indi), flagged_mark, indi_id),
+                    tags=tags,
+                )
+                shown += 1
+                if shown >= self.MAX_LIST_DISPLAY:
+                    break
+
+        def on_search_change(*_):
+            if after_id[0]:
+                dialog.after_cancel(after_id[0])
+            after_id[0] = dialog.after(150, lambda: populate(search_var.get()))
+
+        search_var.trace_add('write', on_search_change)
+        populate()
+
+        def select():
+            sel = picker_tree.selection()
+            if sel:
+                result[0] = sel[0]
+            dialog.destroy()
+
+        picker_tree.bind('<Double-1>', lambda e: select())
+        picker_tree.bind('<Return>', lambda e: select())
+
+        btn_frame = ttk.Frame(dialog, padding=8)
+        btn_frame.pack(fill='x')
+        ttk.Button(btn_frame, text="Select", command=select).pack(side='right', padx=(4, 0))
+        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side='right')
+
+        dialog.wait_window()
+        return result[0]
+
+    def _find_path(self):
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showwarning("No selection",
+                                   "Select a starting person from the main list first.")
+            return
+        start_id = sel[0]
+
+        target_id = self._pick_person("Select Relationship Target")
+        if not target_id:
+            return
+
+        try:
+            max_depth = int(self.max_depth.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Bad value", "Max depth must be an integer.")
+            return
+
+        try:
+            top_n = int(self.top_n.get())
+        except (tk.TclError, ValueError):
+            top_n = 5
+        paths, truncated = bfs_find_all_paths(
+            start_id, target_id, self.individuals, self.families,
+            top_n=top_n, max_depth=max_depth,
+        )
+        self._render_path_results(start_id, target_id, paths, truncated)
+
+    def _render_path_results(self, start_id, end_id, paths, truncated=False):
+        start = self.individuals[start_id]
+        end = self.individuals[end_id]
+        lines = [
+            "Relationship path:",
+            f"  From: {describe(start)}",
+            f"  To:   {describe(end)}",
+            "",
+        ]
+        if start_id == end_id:
+            lines.append("(Same person selected for both.)")
+        elif not paths:
+            lines.append(
+                f"No relationship path found within max depth {self.max_depth.get()}."
+            )
+        else:
+            ancestors = get_ancestor_depths(start_id, self.individuals, self.families)
+            descendants = get_descendant_depths(start_id, self.individuals, self.families)
+            for rank, path in enumerate(paths, 1):
+                dist = len(path) - 1
+                rel = describe_relationship(path, self.individuals,
+                                            ancestors=ancestors, descendants=descendants)
+                lines.append(f"Path #{rank} — {rel} ({dist} edge{'s' if dist != 1 else ''}):")
+                for i, (node_id, edge) in enumerate(path):
+                    indi = self.individuals[node_id]
+                    if i == 0:
+                        lines.append(f"  {describe(indi)}")
+                    else:
+                        lines.append(f"    --[{edge}]--> {describe(indi)}")
+                lines.append("")
+            if truncated:
+                lines.append(
+                    "(Search cap reached — there may be additional paths. "
+                    "Reduce Max depth to search a smaller area.)"
+                )
+        lines.append("")
+
+        self.results.configure(state='normal')
+        self.results.delete('1.0', 'end')
+        self.results.insert('1.0', '\n'.join(lines))
+        self.results.configure(state='disabled')
+
     # ---------------------------------------------------------- History / config
     def _config_path(self):
         if sys.platform == 'win32':
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("com.ajkessel.gedcom-dna-finder")
             base = Path(os.environ.get('APPDATA', Path.home()))
         elif sys.platform == 'darwin':
             base = Path.home() / 'Library' / 'Application Support'

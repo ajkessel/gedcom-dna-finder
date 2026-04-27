@@ -8,7 +8,7 @@ a = Analysis(
     ['gedcom-dna-finder-gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('HELP.md', '.'), ('LICENSE', '.')],
+    datas=[('HELP.md', '.'), ('LICENSE', '.'), ('family_tree.ico','.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
