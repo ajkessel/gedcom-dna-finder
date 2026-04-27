@@ -655,9 +655,10 @@ class DNAMatchFinderApp:
         self.root.minsize(800, 500)
         if sys.platform == 'win32':
             self.root.iconbitmap(self._resource_path('icons/family_tree.ico'))
-        else:
+        elif sys.platform != 'darwin':
             icon = tk.PhotoImage(file=self._resource_path('icons/family_tree.png'))
             self.root.iconphoto(True, icon)
+        # macOS: icon is handled by the .app bundle's .icns file
 
         # Data state
         self.individuals = {}
