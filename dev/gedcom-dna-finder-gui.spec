@@ -56,7 +56,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['./icons/family_tree.ico'],
+    icon=['../icons/family_tree.ico'],
 )
 
 if sys.platform == 'darwin':
@@ -76,5 +76,5 @@ if sys.platform == 'darwin':
 
     app = BUNDLE(coll,
                  name='gedcom-dna-finder.app',
-                 icon='./icons/family_tree.icns',
+                 icon='../icons/family_tree.icns',
                  bundle_identifier='com.ajkessel.gedcom-dna-finder')
