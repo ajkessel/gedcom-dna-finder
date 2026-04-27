@@ -3,7 +3,7 @@
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
 	out="gedcom-dna-finder-linux.zip"
-	python .\generate_icon.py family_tree.ico || {
+	python ./generate_icon.py family_tree.ico || {
 		echo 'Failed to generate ICO file.'
 		exit 1
 	}
