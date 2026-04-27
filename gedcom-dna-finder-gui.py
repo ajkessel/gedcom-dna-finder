@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-gedcom_dna_finder_gui.py
+gedcom-dna-finder-gui.py
 
 Tkinter GUI for finding the nearest DNA-flagged relative(s) to a target
 person in a GEDCOM tree.
@@ -22,8 +22,8 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.3"
-__release_date__ = "2026-04-26"
+__version__ = "0.0.4"
+__release_date__ = "2026-04-27"
 
 import argparse
 import difflib
@@ -31,6 +31,8 @@ import json
 import os
 import re
 import sys
+import tempfile
+import zipfile
 from collections import deque
 from pathlib import Path
 
@@ -111,6 +113,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
             indi = {
                 'id': head_xref,
                 'name': '',
+                'alt_names': [],
                 'sex': '',
                 'famc': [],
                 'fams': [],
@@ -123,8 +126,12 @@ def build_model(gedcom_path, dna_keyword, page_marker):
             for i, (level, _xref, tag, value) in enumerate(rec):
                 if i == 0:
                     continue
-                if level == 1 and tag == 'NAME' and not indi['name']:
-                    indi['name'] = value.replace('/', '').strip()
+                if level == 1 and tag == 'NAME':
+                    cleaned = value.replace('/', '').strip()
+                    if not indi['name']:
+                        indi['name'] = cleaned
+                    if cleaned:
+                        indi['alt_names'].append(cleaned)
                 elif level == 1 and tag == 'SEX':
                     indi['sex'] = value.strip()
                 elif level == 1 and tag == 'FAMC':
@@ -266,6 +273,31 @@ def describe(indi):
     name = indi['name'] or '(unknown)'
     span = lifespan(indi)
     return f'{name} ({span}) [{indi["id"]}]' if span else f'{name} [{indi["id"]}]'
+
+
+# ===========================================================================
+# ZIP support
+# ===========================================================================
+
+def _extract_ged_from_zip(zip_path):
+    """Return (temp_ged_path, entry_name) for the first .ged/.gedcom in a ZIP.
+
+    Prefers top-level entries over those inside subdirectories.
+    Caller is responsible for deleting the returned temp file.
+    """
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        ged_names = sorted(
+            [n for n in zf.namelist() if n.lower().endswith(('.ged', '.gedcom'))],
+            key=lambda n: (n.count('/'), n.lower()),
+        )
+        if not ged_names:
+            raise ValueError("No .ged or .gedcom file found inside the ZIP archive.")
+        chosen = ged_names[0]
+        data = zf.read(chosen)
+    tmp = tempfile.NamedTemporaryFile(suffix='.ged', delete=False)
+    tmp.write(data)
+    tmp.close()
+    return tmp.name, chosen
 
 
 # ===========================================================================
@@ -427,7 +459,7 @@ class DNAMatchFinderApp:
         initialdir = os.path.dirname(current) if current else None
         path = filedialog.askopenfilename(
             title="Select GEDCOM file",
-            filetypes=[("GEDCOM files", "*.ged *.gedcom"), ("All files", "*.*")],
+            filetypes=[("GEDCOM files", "*.ged *.gedcom *.zip"), ("All files", "*.*")],
             initialdir=initialdir,
         )
         if path:
@@ -443,12 +475,23 @@ class DNAMatchFinderApp:
             messagebox.showerror("Not found", f"File not found:\n{path}")
             return
 
+        gedcom_path = path
+        tmp_path = None
+        if path.lower().endswith('.zip'):
+            try:
+                tmp_path, ged_name = _extract_ged_from_zip(path)
+                gedcom_path = tmp_path
+                self.status_text.set(f"Extracted {ged_name} from ZIP…")
+            except Exception as e:
+                messagebox.showerror("ZIP error", f"Could not extract GEDCOM from ZIP:\n\n{e}")
+                return
+
         self.status_text.set("Loading…")
         self.root.config(cursor="watch")
         self.root.update_idletasks()
         try:
             self.individuals, self.families, self.tag_records = build_model(
-                path,
+                gedcom_path,
                 dna_keyword=self.tag_keyword.get(),
                 page_marker=self.page_marker.get(),
             )
@@ -457,6 +500,12 @@ class DNAMatchFinderApp:
             self.status_text.set("Load failed.")
             messagebox.showerror("Parse error", f"Error reading GEDCOM:\n\n{e}")
             return
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
         self.sorted_ids = sorted(
             self.individuals.keys(),
@@ -495,17 +544,23 @@ class DNAMatchFinderApp:
             if flagged_only and not indi['dna_markers']:
                 continue
             if query_tokens:
-                name_lower = indi['name'].lower()
+                all_names = indi['alt_names'] or [indi['name']]
                 id_lower = indi_id.lower()
                 if self.fuzzy_search.get():
-                    name_words = name_lower.split()
                     match = (
-                        all(self._fuzzy_token_matches(tok, name_words) for tok in query_tokens)
+                        any(
+                            all(self._fuzzy_token_matches(tok, name.lower().split())
+                                for tok in query_tokens)
+                            for name in all_names
+                        )
                         or query in id_lower
                     )
                 else:
                     match = (
-                        all(tok in name_lower for tok in query_tokens)
+                        any(
+                            all(tok in name.lower() for tok in query_tokens)
+                            for name in all_names
+                        )
                         or query in id_lower
                     )
                 if not match:

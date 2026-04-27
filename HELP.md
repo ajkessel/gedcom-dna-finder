@@ -59,17 +59,22 @@ Although this software was developed for this DNA use case, you could use it to 
 ### GUI
 
 ```
-python gedcom-dna-finder-gui.py
+python gedcom-dna-finder-gui.py                  # opens with no file loaded
+python gedcom-dna-finder-gui.py /path/to/tree.ged   # auto-loads on startup
 ```
 
-1. Click **Browse** and select your `.ged` file.
+1. Click **Browse** and select your `.ged` file (or pass it on the
+   command line as shown above).
 2. Optionally adjust the tag keyword (default `DNA`) or page marker
    (default `AncestryDNA Match`). The defaults work for files
    exported from Ancestry and Family Tree Maker.
 3. Click **Load**. The status bar will show how many individuals,
    families, and DNA-flagged people were found.
 4. Type a name or INDI ID into the search box to filter the people
-   list. The "DNA-flagged only" checkbox hides everyone else.
+   list. Names are matched by whitespace-separated tokens, in any
+   order, each as a case-insensitive substring — so
+   `John Smith` will find `John Adam Smith`. The
+   "DNA-flagged only" checkbox hides everyone else.
 5. Select a person and click **Find Nearest DNA Matches** (or just
    double-click the row).
 6. The right pane shows the closest flagged relative(s) and the
@@ -93,6 +98,16 @@ python gedcom-dna-finder-cli.py tree.ged --list-flagged _
 # Find the three nearest DNA-flagged relatives by name
 python gedcom-dna-finder-cli.py tree.ged "Jane Doe"
 
+# Names are matched by whitespace-separated tokens, in any order, each as
+# a case-insensitive substring. The middle name is not required:
+# this matches "John Adam Smith".
+python gedcom-dna-finder-cli.py tree.ged "John Smith"
+
+# Fuzzy matching tolerates typos and spelling variants. The default
+# similarity threshold is 0.6; raise it for stricter matches.
+python gedcom-dna-finder-cli.py tree.ged "John Smth" --fuzzy
+python gedcom-dna-finder-cli.py tree.ged "John Smth" --fuzzy --fuzzy-threshold 0.75
+
 # Find by exact INDI ID
 python gedcom-dna-finder-cli.py tree.ged @I1234@
 
@@ -106,25 +121,27 @@ python gedcom-dna-finder-cli.py tree.ged "Jane Doe" --top 5 --max-depth 80
 
 #### Full CLI options
 
-| Flag             | Default              | Description                                                                |
-|------------------|----------------------|----------------------------------------------------------------------------|
-| `--top`          | 3                    | Number of nearest matches to return.                                       |
-| `--max-depth`    | 50                   | Maximum BFS depth, in edges.                                               |
-| `--page-marker`  | `AncestryDNA Match`  | Substring to look for in source-citation `PAGE` text. Case-insensitive.    |
-| `--tag-keyword`  | `DNA`                | Substring to look for in `_MTTAG` `NAME` values. Case-insensitive.         |
-| `--list-tags`    |                      | Print all `_MTTAG` definitions in the file and exit.                       |
-| `--list-flagged` |                      | Print every individual currently flagged as a DNA match and exit.          |
+| Flag                | Default              | Description                                                                |
+|---------------------|----------------------|----------------------------------------------------------------------------|
+| `--top`             | 3                    | Number of nearest matches to return.                                       |
+| `--max-depth`       | 50                   | Maximum BFS depth, in edges.                                               |
+| `--page-marker`     | `AncestryDNA Match`  | Substring to look for in source-citation `PAGE` text. Case-insensitive.    |
+| `--tag-keyword`     | `DNA`                | Substring to look for in `_MTTAG` `NAME` values. Case-insensitive.         |
+| `--fuzzy`           | off                  | Enable fuzzy name matching for typos and spelling variants.                |
+| `--fuzzy-threshold` | 0.6                  | Similarity cutoff for `--fuzzy`, between 0.0 and 1.0. Lower = more matches. |
+| `--list-tags`       |                      | Print all `_MTTAG` definitions in the file and exit.                       |
+| `--list-flagged`    |                      | Print every individual currently flagged as a DNA match and exit.          |
 
 ## Example output
 
 ```
-Starting from: John Q. Smith (1850-1920) [@I1234@]
+Starting from: John A. Smith (1850-1920) [@I1234@]
 
 #1: Mary E. Doe (1965-) [@I9876@]    (distance: 5 edges)
    DNA markers:
      - Source citation PAGE: "AncestryDNA Match to Mary E. Doe"
    Path:
-     John Q. Smith (1850-1920) [@I1234@]
+     John A. Smith (1850-1920) [@I1234@]
        --[child]--> Robert Smith (1880-1950) [@I1240@]
        --[child]--> Helen Smith (1910-1985) [@I1245@]
        --[child]--> Janet Smith (1942-) [@I1250@]

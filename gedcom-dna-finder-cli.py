@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-find_nearest_dna_match.py
+gedcom-dna-finder-gui.py
 
 Given a GEDCOM file and a target person, find the closest relative(s)
 who are flagged as DNA matches.
@@ -10,7 +10,7 @@ Two DNA-flag signals are detected (either is sufficient):
   1. A source-citation PAGE line whose text contains "AncestryDNA Match"
      (the format Ancestry uses when you tag a person as a DNA match in
      an Ancestry-managed tree, e.g.
-       2 PAGE AncestryDNA Match to Nada Weine Bernat
+       2 PAGE AncestryDNA Match to James Q. Smith
      attached at any depth under the individual's record).
 
   2. An _MTTAG line whose value is a pointer to a tag-record whose NAME
@@ -28,25 +28,38 @@ Pure stdlib; no external dependencies.
 Usage examples:
 
   # Inspect all tag definitions present in your GEDCOM
-  python find_nearest_dna_match.py tree.ged --list-tags _
+  python gedcom-dna-finder-cli.py tree.ged --list-tags
 
   # List every DNA-flagged person
-  python find_nearest_dna_match.py tree.ged --list-flagged _
+  python gedcom-dna-finder-cli.py tree.ged --list-flagged
 
   # Find the 3 nearest DNA-flagged relatives of a person, by name
-  python find_nearest_dna_match.py tree.ged "John Q Smith"
+  python gedcom-dna-finder-cli.py tree.ged "John A Smith"
+
+  # Names are tokenized: this matches "John Adam Smith"
+  # without needing the middle name.
+  python gedcom-dna-finder-cli.py tree.ged "John Smith"
 
   # Find by exact INDI ID (with or without surrounding @)
-  python find_nearest_dna_match.py tree.ged @I1234@
-  python find_nearest_dna_match.py tree.ged I1234
+  python gedcom-dna-finder-cli.py tree.ged @I1234@
+  python gedcom-dna-finder-cli.py tree.ged I1234
 
   # Tighten the tag filter to "DNA Match" only (exclude DNA Connection etc.)
-  python find_nearest_dna_match.py tree.ged "John Smith" --tag-keyword "DNA Match"
+  python gedcom-dna-finder-cli.py tree.ged "John Smith" --tag-keyword "DNA Match"
+
+  # Fuzzy match (tolerates typos and spelling variants):
+  # "John Smth" will still find "John Adam Smith".
+  python gedcom-dna-finder-cli.py tree.ged "John Smith" --fuzzy
+  python gedcom-dna-finder-cli.py tree.ged "John Smith" --fuzzy --fuzzy-threshold 0.7
 """
 
 import argparse
+import difflib
+import os
 import re
 import sys
+import tempfile
+import zipfile
 from collections import deque
 
 
@@ -126,6 +139,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
             indi = {
                 'id': head_xref,
                 'name': '',
+                'alt_names': [],
                 'sex': '',
                 'famc': [],
                 'fams': [],
@@ -140,8 +154,12 @@ def build_model(gedcom_path, dna_keyword, page_marker):
                 if i == 0:
                     continue
 
-                if level == 1 and tag == 'NAME' and not indi['name']:
-                    indi['name'] = value.replace('/', '').strip()
+                if level == 1 and tag == 'NAME':
+                    cleaned = value.replace('/', '').strip()
+                    if not indi['name']:
+                        indi['name'] = cleaned
+                    if cleaned:
+                        indi['alt_names'].append(cleaned)
                 elif level == 1 and tag == 'SEX':
                     indi['sex'] = value.strip()
                 elif level == 1 and tag == 'FAMC':
@@ -298,17 +316,75 @@ def bfs_find_dna_matches(start_id, individuals, families, top_n, max_depth):
 # Lookup and output
 # ---------------------------------------------------------------------------
 
-def find_target(individuals, query):
+def find_target(individuals, query, fuzzy=False, fuzzy_threshold=0.6, fuzzy_max=30):
+    """Return a ranked list of (indi_id, score) candidates for `query`.
+
+    Score is None for exact-intent matches (INDI ID lookup or token match).
+    Score is a float in [0, 1] for fuzzy matches (only present when
+    `fuzzy=True`). Token matches are listed first, then fuzzy matches by
+    descending score.
+
+    Name matching is whitespace-tokenized and order-independent: the query
+    "John Smith" matches "John Adam Smith", and so does
+    "smith john". Each token is a case-insensitive substring match,
+    so partial tokens like "Smith" also work.
+    """
     q = query.strip()
+
+    # Direct INDI ID lookups (unaffected by tokenization or fuzzy).
     if q.startswith('@') and q.endswith('@'):
-        return [q] if q in individuals else []
+        return [(q, None)] if q in individuals else []
     if re.fullmatch(r'[A-Za-z]+\d+', q):
         candidate = f'@{q}@'
         if candidate in individuals:
-            return [candidate]
+            return [(candidate, None)]
+
     q_lower = q.lower()
-    return [iid for iid, indi in individuals.items()
-            if q_lower in indi['name'].lower()]
+    tokens = q_lower.split()
+    if not tokens:
+        return []
+
+    # Token match: every whitespace-separated token must appear (as a
+    # substring) somewhere in at least one of the person's names, in any order.
+    def _token_match(indi):
+        names = indi['alt_names'] or [indi['name']]
+        return any(all(tok in name.lower() for tok in tokens) for name in names)
+
+    token_matches = [iid for iid, indi in individuals.items() if _token_match(indi)]
+    token_matches.sort(key=lambda iid: individuals[iid]['name'].lower())
+
+    if not fuzzy:
+        return [(iid, None) for iid in token_matches]
+
+    # Fuzzy: add anything similar enough that wasn't already a token match.
+    # SequenceMatcher with seq2 set once is faster (it caches b2j on seq2).
+    token_match_set = set(token_matches)
+    matcher = difflib.SequenceMatcher(autojunk=False)
+    matcher.set_seq2(q_lower)
+    fuzzy_candidates = []
+    for iid, indi in individuals.items():
+        if iid in token_match_set:
+            continue
+        names = indi['alt_names'] or ([indi['name']] if indi['name'] else [])
+        if not names:
+            continue
+        best_score = 0.0
+        for name in names:
+            matcher.set_seq1(name.lower())
+            if matcher.quick_ratio() < fuzzy_threshold:
+                continue
+            score = matcher.ratio()
+            if score > best_score:
+                best_score = score
+        if best_score >= fuzzy_threshold:
+            fuzzy_candidates.append((best_score, iid))
+
+    fuzzy_candidates.sort(key=lambda x: (-x[0], individuals[x[1]]['name'].lower()))
+    fuzzy_candidates = fuzzy_candidates[:fuzzy_max]
+
+    result = [(iid, None) for iid in token_matches]
+    result.extend((iid, score) for score, iid in fuzzy_candidates)
+    return result
 
 
 def lifespan(indi):
@@ -358,6 +434,31 @@ def print_result(start_id, individuals, results):
 
 
 # ---------------------------------------------------------------------------
+# ZIP support
+# ---------------------------------------------------------------------------
+
+def extract_ged_from_zip(zip_path):
+    """Return (temp_ged_path, entry_name) for the first .ged/.gedcom in a ZIP.
+
+    Prefers top-level entries over those inside subdirectories.
+    Caller is responsible for deleting the returned temp file.
+    """
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        ged_names = sorted(
+            [n for n in zf.namelist() if n.lower().endswith(('.ged', '.gedcom'))],
+            key=lambda n: (n.count('/'), n.lower()),
+        )
+        if not ged_names:
+            raise ValueError("No .ged or .gedcom file found inside the ZIP archive.")
+        chosen = ged_names[0]
+        data = zf.read(chosen)
+    tmp = tempfile.NamedTemporaryFile(suffix='.ged', delete=False)
+    tmp.write(data)
+    tmp.close()
+    return tmp.name, chosen
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -366,7 +467,10 @@ def main():
         description='Find the nearest DNA-flagged relative(s) to a target person in a GEDCOM tree.'
     )
     parser.add_argument('gedcom', help='Path to the GEDCOM file (.ged).')
-    parser.add_argument('target', help='Target: INDI ID (e.g. @I123@ or I123) or a name substring. '
+    parser.add_argument('target', help='Target: INDI ID (e.g. @I123@ or I123) or a name. '
+                                       'Names are matched by whitespace-separated tokens, '
+                                       'each as a case-insensitive substring, in any order — '
+                                       'so "John Smith" matches "John Adam Smith". '
                                        'Use "_" as a placeholder when combined with --list-tags or --list-flagged.')
     parser.add_argument('--top', type=int, default=3,
                         help='Number of nearest matches to return (default 3).')
@@ -378,18 +482,44 @@ def main():
     parser.add_argument('--tag-keyword', default='DNA',
                         help='Case-insensitive substring to match in _MTTAG NAME values. '
                              'Default: "DNA". Use "DNA Match" to exclude DNA Connection / Common DNA Ancestor.')
+    parser.add_argument('--fuzzy', action='store_true',
+                        help='Enable fuzzy name matching. In addition to token matches, '
+                             'include names whose similarity to the query exceeds '
+                             '--fuzzy-threshold. Useful for typos and spelling variants.')
+    parser.add_argument('--fuzzy-threshold', type=float, default=0.6,
+                        help='Similarity cutoff for --fuzzy, between 0.0 and 1.0 (default 0.6). '
+                             'Lower = more matches, higher = stricter. '
+                             'Uses difflib.SequenceMatcher.ratio.')
     parser.add_argument('--list-tags', action='store_true',
                         help='Print all _MTTAG definitions found in the file and exit.')
     parser.add_argument('--list-flagged', action='store_true',
                         help='Print every individual currently flagged as a DNA match and exit.')
     args = parser.parse_args()
 
+    gedcom_path = args.gedcom
+    tmp_path = None
+    if gedcom_path.lower().endswith('.zip'):
+        try:
+            tmp_path, ged_name = extract_ged_from_zip(gedcom_path)
+            print(f'Extracted {ged_name!r} from ZIP.', file=sys.stderr)
+            gedcom_path = tmp_path
+        except Exception as e:
+            print(f'Error: {e}', file=sys.stderr)
+            sys.exit(1)
+
     print(f'Parsing {args.gedcom} ...', file=sys.stderr)
-    individuals, families, tag_records = build_model(
-        args.gedcom,
-        dna_keyword=args.tag_keyword,
-        page_marker=args.page_marker,
-    )
+    try:
+        individuals, families, tag_records = build_model(
+            gedcom_path,
+            dna_keyword=args.tag_keyword,
+            page_marker=args.page_marker,
+        )
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
     print(f'  {len(individuals)} individuals, {len(families)} families, '
           f'{len(tag_records)} _MTTAG definitions', file=sys.stderr)
 
@@ -411,20 +541,28 @@ def main():
                 print(f'  - {m}')
         return
 
-    candidates = find_target(individuals, args.target)
+    candidates = find_target(
+        individuals, args.target,
+        fuzzy=args.fuzzy,
+        fuzzy_threshold=args.fuzzy_threshold,
+    )
     if not candidates:
-        print(f'No individuals match: {args.target!r}', file=sys.stderr)
+        msg = f'No individuals match: {args.target!r}'
+        if not args.fuzzy:
+            msg += '  (try --fuzzy to allow typos and spelling variants)'
+        print(msg, file=sys.stderr)
         sys.exit(1)
     if len(candidates) > 1:
         print(f'Multiple candidates match {args.target!r}:', file=sys.stderr)
-        for cid in candidates[:25]:
-            print(f'  {describe(individuals[cid])}', file=sys.stderr)
+        for cid, score in candidates[:25]:
+            score_str = f'  [fuzzy: {score:.2f}]' if score is not None else ''
+            print(f'  {describe(individuals[cid])}{score_str}', file=sys.stderr)
         if len(candidates) > 25:
             print(f'  ... and {len(candidates) - 25} more', file=sys.stderr)
         print('Refine the query, or pass an exact INDI ID.', file=sys.stderr)
         sys.exit(1)
 
-    start_id = candidates[0]
+    start_id = candidates[0][0]
     results = bfs_find_dna_matches(
         start_id, individuals, families,
         top_n=args.top, max_depth=args.max_depth,
