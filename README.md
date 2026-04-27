@@ -9,7 +9,6 @@ Downloads:
 * [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-linux.zip)
 
 ![Main window](docs/screenshots/main-window.png)
-![Relationship window](docs/screenshots/relationship-path.png)
 
 This is an alpha release. Only one person has tested it so far--me.
 
@@ -97,6 +96,16 @@ can be run from anywhere.
 ## Usage
 
 For pre-built binaries, just run the executable. 
+
+### Relationship finder
+
+![Relationship window](docs/screenshots/relationship-path.png)
+
+This is an alternate use of this tool. Select a person in the search
+panel, then click on "Find Relationship Path..." and select a second
+person. This tool will then show you the top three paths (if they
+exist) between those two people. You can change the number of paths
+to an arbitrary number by editing the "Top N" value in the bottom right.
 
 ### MacOS security
 
