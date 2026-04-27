@@ -1,6 +1,10 @@
 #!/bin/bash
-[[ -e dev/ ]] && cd ..
+[[ -e dev/ ]] || cd ..
 [[ -e dist/ ]] && rm -r dist/
+[[ -e gedcom-dna-finder-gui.py ]] || {
+  echo 'Build files not found.'
+  exit 1
+}
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
 	out="dist/gedcom-dna-finder-linux.zip"
