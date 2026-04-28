@@ -6,7 +6,7 @@ tree or find all of the paths between any two people in your tree.
 Available as a graphical tool as well as a command-line version.
 
 Downloads:
-* [Windows](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-windows.zip)
+* [Windows](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-windows.zip) (see [security note](#windows-security))
 * [Mac](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-mac.zip) (see [security note](#macos-security))
 * [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-linux.zip)
 
@@ -274,6 +274,12 @@ The tool runs entirely locally on your machine. Nothing is uploaded.
 Be aware, however, that your `.ged` file likely contains personal
 information about living people; do not commit your real GEDCOM to a
 public repository or create issues or provide feedback to this repository with any personal data.
+
+## Windows security
+
+You may get a warning from Windows Defender that this is an unrecognized app from an unknown publisher. You can run the application by clicking first on "more info" and then "run away." It should only ask the first time you execute the software.
+
+![Windows Screenshot](docs/screenshots/windows_security.png)
 
 ## MacOS security
 
