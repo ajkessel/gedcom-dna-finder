@@ -302,6 +302,10 @@ If you follow these steps and are seeing an error along the lines of "This file 
 This project is released under the BSD 2-Clause License. See the
 [`LICENSE`](LICENSE) file for the full text.
 
+## Recent changes
+
+See [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Contributing
 
 Bug reports and pull requests are welcome. If you encounter a GEDCOM
