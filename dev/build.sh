@@ -17,13 +17,14 @@ else
 	echo 'Building for macOS...'
   command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
   export PYENV_ROOT="$HOME/.pyenv"
-  [[ -e "${PYENV_ROOT}/bin" ]] || {
+  [[ -e "${PYENV_ROOT}" ]] || {
     echo 'Installing pyenv for python 3.14.4'
     mkdir -p "${PYENV_ROOT}"
     eval "$(pyenv init -)"
     pyenv install 3.14.4
     pyenv global 3.14.4
   }
+  eval "$(pyenv init -)"
   [[ -d "${PYENV_ROOT}/bin" ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 	out="gedcom-dna-finder-mac.zip"
 	./dev/generate_icns.sh ./icons/family_tree.png || {
