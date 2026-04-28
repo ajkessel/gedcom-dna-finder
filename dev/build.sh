@@ -17,7 +17,7 @@ else
 	echo 'Building for macOS...'
   command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
   export PYENV_ROOT="$HOME/.pyenv"
-  [[ -e "${PYENV_ROOT}" ]] || {
+  [[ -e "${PYENV_ROOT}/bin" ]] || {
     echo 'Installing pyenv for python 3.14.4'
     mkdir -p "${PYENV_ROOT}"
     eval "$(pyenv init -)"
