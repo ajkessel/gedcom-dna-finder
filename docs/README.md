@@ -1,7 +1,7 @@
 # GEDCOM DNA Finder
 
 Find the closest DNA-flagged relative to any person in a GEDCOM family
-tree, find all of the paths between any two people in your tree, or simply search your tree for variations on names and other information like geographical locations.
+tree, show an arbitrary number of paths between any two people in your tree, or rapidly search your tree for variations on names and other information like geographical locations.
 
 Available as a graphical tool as well as a command-line version.
 
@@ -133,7 +133,7 @@ python gedcom-dna-finder-gui.py /path/to/tree.ged   # auto-loads on startup
 ```
 
 1. Click **Browse** and select your `.ged` file (or pass it on the
-   command line as shown above).
+   command line as shown above). The tool will also find a `.ged` file inside a `.zip` file, since a tree downloaded from Ancestry will be zipped.
 2. Optionally adjust the tag keyword (default `DNA`) or page marker
    (default `AncestryDNA Match`). The defaults work for files
    exported from Ancestry and Family Tree Maker.
