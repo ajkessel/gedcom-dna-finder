@@ -22,7 +22,7 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 __release_date__ = "2026-04-28"
 
 import argparse
@@ -722,6 +722,7 @@ class DNAMatchFinderApp:
         self.tag_keyword = tk.StringVar(value="DNA")
         self.page_marker = tk.StringVar(value="AncestryDNA Match")
         self.search_text = tk.StringVar()
+        self.filter_text = tk.StringVar()
         self.show_flagged_only = tk.BooleanVar(value=False)
         self.top_n = tk.IntVar(value=3)
         self.max_depth = tk.IntVar(value=50)
@@ -730,6 +731,7 @@ class DNAMatchFinderApp:
         self.fuzzy_search = tk.BooleanVar(value=False)
 
         self.search_text.trace_add('write', self._on_search_change)
+        self.filter_text.trace_add('write', self._on_search_change)
         self.show_flagged_only.trace_add('write', self._on_search_change)
         self.fuzzy_search.trace_add('write', self._on_search_change)
         self._search_after_id = None
@@ -815,6 +817,13 @@ class DNAMatchFinderApp:
         ttk.Checkbutton(
             search_frame, text="Fuzzy", variable=self.fuzzy_search
         ).pack(side='left', padx=(8, 0))
+
+        filter_frame = ttk.Frame(left)
+        filter_frame.pack(fill='x', pady=(2, 0))
+        ttk.Label(filter_frame, text="Filter:", underline=1).pack(side='left', padx=(0, 4))
+        self.filter_entry = ttk.Entry(filter_frame, textvariable=self.filter_text)
+        self.filter_entry.pack(side='left', fill='x', expand=True)
+        self.filter_entry.bind('<Return>', lambda _: self._kb_focus_list())
 
         list_frame = ttk.Frame(left)
         list_frame.pack(fill='both', expand=True, pady=(4, 0))
@@ -1032,6 +1041,7 @@ class DNAMatchFinderApp:
 
         query = self.search_text.get().strip().lower()
         query_tokens = query.split()
+        filter_query = self.filter_text.get().strip().lower()
         flagged_only = self.show_flagged_only.get()
         flagged_count = sum(
             1 for i in self.individuals.values() if i['dna_markers'])
@@ -1063,6 +1073,10 @@ class DNAMatchFinderApp:
                         or query in id_lower
                     )
                 if not match:
+                    continue
+            if filter_query:
+                raw_text = ' '.join(v.lower() for _, _, _, v in indi['_raw'])
+                if filter_query not in raw_text:
                     continue
             if shown >= self.MAX_LIST_DISPLAY:
                 truncated = True
@@ -1593,6 +1607,7 @@ class DNAMatchFinderApp:
             self.root.bind(seq, lambda _: cmd() or 'break')
 
         bind('<Control-f>', self._kb_focus_search)
+        bind('<Control-i>', self._kb_focus_filter)
         bind('<Control-d>', lambda: self.show_flagged_only.set(
             not self.show_flagged_only.get()))
         bind('<Control-u>', lambda: self.fuzzy_search.set(
@@ -1625,6 +1640,10 @@ class DNAMatchFinderApp:
     def _kb_focus_search(self):
         self.search_entry.focus_set()
         self.search_entry.select_range(0, 'end')
+
+    def _kb_focus_filter(self):
+        self.filter_entry.focus_set()
+        self.filter_entry.select_range(0, 'end')
 
     def _kb_focus_list(self):
         self.tree.focus_set()

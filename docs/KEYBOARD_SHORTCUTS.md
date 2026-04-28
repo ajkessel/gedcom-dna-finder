@@ -3,6 +3,7 @@
 | Shortcut | Action |
 |----------|--------|
 | **Ctrl+F** | Jump to the Search box and select all text |
+| **Ctrl+I** | Jump to the **F**ilter box and select all text |
 | **Ctrl+D** | Toggle the **DNA-flagged only** filter |
 | **Ctrl+U** | Toggle **Fuzzy** search mode |
 | **Ctrl+O** | Open the file browser (Browse…) |

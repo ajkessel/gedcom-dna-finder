@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.8] - 2026-04-28
+
+### Added
+
+- **Filter field** — a new "Filter:" text entry below the "Find:" box narrows the people list by searching the complete raw GEDCOM record for each person, not just the name. Type any text that appears in a GEDCOM entry — a location, source, event type, or any other field — to restrict results to only those individuals whose records contain that text. `Ctrl+I` jumps to the Filter box and selects all text.
+- **Enter key moves focus to list** — pressing Enter in either the Find or Filter box immediately moves keyboard focus to the people list, so you can navigate straight to a result without reaching for the mouse.
+- **Escape clears results** — the Escape key now triggers the same "clear results" action as `Ctrl+L`, providing a quick way to reset the results pane from anywhere in the window.
+
+### Improved
+
+- **Tab order** — Tab now follows a logical left-to-right, top-to-bottom sequence through the main controls: Find → Filter → people list → results pane → Top N → Max Depth → Set Home → Show Person → Find Nearest DNA Matches. Shift+Tab traverses the same chain in reverse. The vertical scrollbar on the people list is excluded from tab traversal.
+- **Focus on list entry** — when focus moves to the people list (via Enter from a search box, `Ctrl+L`, or Tab), the first row is automatically selected if no row is already focused, so arrow-key navigation works immediately without an extra keypress.
+- **Clear results behavior** — `Ctrl+L` (and Escape) now also clears the Find box and resets the last result state, then returns focus to the Find box for a clean start.
+
 ## [0.0.7] - 2026-04-28
 
 ### Added

@@ -27,6 +27,8 @@ tree. If you set a person as the "Home Person" using the "Set Home" button,
 the results will include the path from the selected person to the Home Person
 in addition to the closest people with DNA match markers.
 
+Finally, if you have a large tree, you may find it difficult to search for specific individuals in tools like Ancestry or Family Tree Maker. Ancestry only searches on the person's "main name" and not any of the alternate names, and neither service allows fuzzy matching searches. Ancestry also does not allow you to easily search on multiple fields, like name and location. With this tool, you can search for a name with fuzzy matching (e.g. "John Smith" in the "Find:" box) and then further limit the results by a term that appears anywhere in the person's record (e.g. "Chicago" in the "Filter" box).
+
 ## What it does
 
 Given a GEDCOM file and a target individual, the tool performs a
