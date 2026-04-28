@@ -433,7 +433,8 @@ def _edge_to_term(edge, sex):
 
 _ORDINALS = ['', 'first', 'second', 'third', 'fourth', 'fifth',
              'sixth', 'seventh', 'eighth', 'ninth', 'tenth']
-_REMOVALS = {1: 'once', 2: 'twice', 3: 'three times', 4: 'four times', 5: 'five times'}
+_REMOVALS = {1: 'once', 2: 'twice', 3: 'three times',
+             4: 'four times', 5: 'five times'}
 
 
 def get_ancestor_depths(start_id, individuals, families):
@@ -509,13 +510,15 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
     def ancestor_term(n, sex):
         if n == 1:
             return 'father' if sex == 'M' else ('mother' if sex == 'F' else 'parent')
-        gp = 'grandfather' if sex == 'M' else ('grandmother' if sex == 'F' else 'grandparent')
+        gp = 'grandfather' if sex == 'M' else (
+            'grandmother' if sex == 'F' else 'grandparent')
         return 'great-' * (n - 2) + gp
 
     def descendant_term(n, sex):
         if n == 1:
             return 'son' if sex == 'M' else ('daughter' if sex == 'F' else 'child')
-        gc = 'grandson' if sex == 'M' else ('granddaughter' if sex == 'F' else 'grandchild')
+        gc = 'grandson' if sex == 'M' else (
+            'granddaughter' if sex == 'F' else 'grandchild')
         return 'great-' * (n - 2) + gc
 
     # If the target is a known biological ancestor/descendant, use the direct
@@ -598,12 +601,15 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
     more_desc = d_eff > u_eff   # target is further from the common ancestor
 
     if cn == 0 and rem == 0:
-        core = 'brother' if target_sex == 'M' else ('sister' if target_sex == 'F' else 'sibling')
+        core = 'brother' if target_sex == 'M' else (
+            'sister' if target_sex == 'F' else 'sibling')
     elif cn == 0:
         if more_desc:
-            core = 'nephew' if target_sex == 'M' else ('niece' if target_sex == 'F' else 'niece/nephew')
+            core = 'nephew' if target_sex == 'M' else (
+                'niece' if target_sex == 'F' else 'niece/nephew')
         else:
-            core = 'uncle' if target_sex == 'M' else ('aunt' if target_sex == 'F' else 'uncle/aunt')
+            core = 'uncle' if target_sex == 'M' else (
+                'aunt' if target_sex == 'F' else 'uncle/aunt')
         if rem > 1:
             core = 'great-' * (rem - 1) + core
     else:
@@ -630,7 +636,8 @@ def _extract_ged_from_zip(zip_path):
             key=lambda n: (n.count('/'), n.lower()),
         )
         if not ged_names:
-            raise ValueError("No .ged or .gedcom file found inside the ZIP archive.")
+            raise ValueError(
+                "No .ged or .gedcom file found inside the ZIP archive.")
         chosen = ged_names[0]
         data = zf.read(chosen)
     tmp = tempfile.NamedTemporaryFile(suffix='.ged', delete=False)
@@ -656,7 +663,8 @@ class DNAMatchFinderApp:
         if sys.platform == 'win32':
             self.root.iconbitmap(self._resource_path('icons/family_tree.ico'))
         elif sys.platform != 'darwin':
-            icon = tk.PhotoImage(file=self._resource_path('icons/family_tree.png'))
+            icon = tk.PhotoImage(
+                file=self._resource_path('icons/family_tree.png'))
             self.root.iconphoto(True, icon)
         # macOS: icon is handled by the .app bundle's .icns file
 
@@ -664,7 +672,8 @@ class DNAMatchFinderApp:
         self.individuals = {}
         self.families = {}
         self.tag_records = {}
-        self.sorted_ids = []  # all IDs sorted by name (computed once after load)
+        # all IDs sorted by name (computed once after load)
+        self.sorted_ids = []
 
         # UI state
         self.gedcom_path = tk.StringVar()
@@ -686,7 +695,8 @@ class DNAMatchFinderApp:
         self.top_n.trace_add('write', self._on_settings_change)
         self.max_depth.trace_add('write', self._on_settings_change)
         self._settings_after_id = None
-        self._last_result = None  # {'type': 'dna_matches'|'path', 'start_id': ..., 'end_id': ...}
+        # {'type': 'dna_matches'|'path', 'start_id': ..., 'end_id': ...}
+        self._last_result = None
 
         self._recent_files = self._load_history()
 
@@ -705,19 +715,29 @@ class DNAMatchFinderApp:
             file_frame, textvariable=self.gedcom_path, values=self._recent_files
         )
         self.path_combo.pack(side='left', fill='x', expand=True, padx=(0, 4))
-        self.path_combo.bind('<<ComboboxSelected>>', lambda _: self._load_file())
-        ttk.Button(file_frame, text="Browse…", command=self._browse).pack(side='left', padx=2)
-        ttk.Button(file_frame, text="Load", command=self._load_file).pack(side='left', padx=2)
+        self.path_combo.bind('<<ComboboxSelected>>',
+                             lambda _: self._load_file())
+        ttk.Button(file_frame, text="Browse…",
+                   command=self._browse).pack(side='left', padx=2)
+        ttk.Button(file_frame, text="Load", command=self._load_file).pack(
+            side='left', padx=2)
 
         # Settings row
-        settings_frame = ttk.LabelFrame(outer, text="DNA marker settings (apply on next Load)", padding=8)
+        settings_frame = ttk.LabelFrame(
+            outer, text="DNA marker settings (apply on next Load)", padding=8)
         settings_frame.pack(fill='x', pady=(8, 0))
-        ttk.Label(settings_frame, text="Tag keyword:").grid(row=0, column=0, sticky='w', padx=(0, 4))
-        ttk.Entry(settings_frame, textvariable=self.tag_keyword, width=20).grid(row=0, column=1, padx=(0, 16))
-        ttk.Label(settings_frame, text="Page marker:").grid(row=0, column=2, sticky='w', padx=(0, 4))
-        ttk.Entry(settings_frame, textvariable=self.page_marker, width=30).grid(row=0, column=3, padx=(0, 16))
-        ttk.Button(settings_frame, text="View tag definitions…", command=self._view_tags).grid(row=0, column=4, padx=4)
-        ttk.Button(settings_frame, text="Find Relationship Path…", command=self._find_path).grid(row=0, column=5, padx=(12, 4))
+        ttk.Label(settings_frame, text="Tag keyword:").grid(
+            row=0, column=0, sticky='w', padx=(0, 4))
+        ttk.Entry(settings_frame, textvariable=self.tag_keyword,
+                  width=20).grid(row=0, column=1, padx=(0, 16))
+        ttk.Label(settings_frame, text="Page marker:").grid(
+            row=0, column=2, sticky='w', padx=(0, 4))
+        ttk.Entry(settings_frame, textvariable=self.page_marker,
+                  width=30).grid(row=0, column=3, padx=(0, 16))
+        ttk.Button(settings_frame, text="View tag definitions…",
+                   command=self._view_tags).grid(row=0, column=4, padx=4)
+        ttk.Button(settings_frame, text="Find Relationship Path…",
+                   command=self._find_path).grid(row=0, column=5, padx=(12, 4))
 
         # Main paned area
         paned = ttk.PanedWindow(outer, orient='horizontal')
@@ -758,7 +778,8 @@ class DNAMatchFinderApp:
         self.tree.column('flagged', width=50, anchor='center', stretch=False)
         self.tree.column('id', width=90, anchor='w', stretch=False)
 
-        ysb = ttk.Scrollbar(list_frame, orient='vertical', command=self.tree.yview)
+        ysb = ttk.Scrollbar(list_frame, orient='vertical',
+                            command=self.tree.yview)
         self.tree.configure(yscrollcommand=ysb.set)
         self.tree.pack(side='left', fill='both', expand=True)
         ysb.pack(side='right', fill='y')
@@ -794,8 +815,10 @@ class DNAMatchFinderApp:
         results_header = ttk.Frame(right)
         results_header.pack(fill='x')
         ttk.Label(results_header, text="Results:").pack(side='left')
-        ttk.Button(results_header, text="Copy", command=self._copy_results).pack(side='right')
-        ttk.Button(results_header, text="Clear", command=self._clear_results).pack(side='right', padx=(0, 4))
+        ttk.Button(results_header, text="Copy",
+                   command=self._copy_results).pack(side='right')
+        ttk.Button(results_header, text="Clear", command=self._clear_results).pack(
+            side='right', padx=(0, 4))
 
         self.results = scrolledtext.ScrolledText(
             right, font=('Courier', 10), wrap='word', height=10
@@ -804,7 +827,8 @@ class DNAMatchFinderApp:
         self.results.configure(state='disabled')
 
         # Status bar
-        status = ttk.Label(outer, textvariable=self.status_text, relief='sunken', anchor='w')
+        status = ttk.Label(outer, textvariable=self.status_text,
+                           relief='sunken', anchor='w')
         status.pack(fill='x', pady=(8, 0))
 
     # ---------------------------------------------------------- Handlers
@@ -813,7 +837,8 @@ class DNAMatchFinderApp:
         initialdir = os.path.dirname(current) if current else None
         path = filedialog.askopenfilename(
             title="Select GEDCOM file",
-            filetypes=[("GEDCOM files", "*.ged *.gedcom *.zip"), ("All files", "*.*")],
+            filetypes=[("GEDCOM files", "*.ged *.gedcom *.zip"),
+                       ("All files", "*.*")],
             initialdir=initialdir,
         )
         if path:
@@ -823,7 +848,8 @@ class DNAMatchFinderApp:
     def _load_file(self):
         path = self.gedcom_path.get().strip()
         if not path:
-            messagebox.showerror("No file", "Please choose a GEDCOM file first.")
+            messagebox.showerror(
+                "No file", "Please choose a GEDCOM file first.")
             return
         if not os.path.isfile(path):
             messagebox.showerror("Not found", f"File not found:\n{path}")
@@ -837,7 +863,8 @@ class DNAMatchFinderApp:
                 gedcom_path = tmp_path
                 self.status_text.set(f"Extracted {ged_name} from ZIP…")
             except Exception as e:
-                messagebox.showerror("ZIP error", f"Could not extract GEDCOM from ZIP:\n\n{e}")
+                messagebox.showerror(
+                    "ZIP error", f"Could not extract GEDCOM from ZIP:\n\n{e}")
                 return
 
         self.status_text.set("Loading…")
@@ -852,7 +879,8 @@ class DNAMatchFinderApp:
         except Exception as e:
             self.root.config(cursor="")
             self.status_text.set("Load failed.")
-            messagebox.showerror("Parse error", f"Error reading GEDCOM:\n\n{e}")
+            messagebox.showerror(
+                "Parse error", f"Error reading GEDCOM:\n\n{e}")
             return
         finally:
             if tmp_path:
@@ -919,7 +947,8 @@ class DNAMatchFinderApp:
         query = self.search_text.get().strip().lower()
         query_tokens = query.split()
         flagged_only = self.show_flagged_only.get()
-        flagged_count = sum(1 for i in self.individuals.values() if i['dna_markers'])
+        flagged_count = sum(
+            1 for i in self.individuals.values() if i['dna_markers'])
 
         shown = 0
         truncated = False
@@ -956,7 +985,8 @@ class DNAMatchFinderApp:
             flagged_mark = '✓' if indi['dna_markers'] else ''
             self.tree.insert(
                 '', 'end', iid=indi_id,
-                values=(indi['name'] or '(unknown)', lifespan(indi), flagged_mark, indi_id),
+                values=(indi['name'] or '(unknown)',
+                        lifespan(indi), flagged_mark, indi_id),
                 tags=tags,
             )
             shown += 1
@@ -990,7 +1020,8 @@ class DNAMatchFinderApp:
 
     def _fuzzy_token_matches(self, token, name_words):
         return any(
-            difflib.SequenceMatcher(None, token, word).ratio() >= self.FUZZY_THRESHOLD
+            difflib.SequenceMatcher(
+                None, token, word).ratio() >= self.FUZZY_THRESHOLD
             for word in name_words
         )
 
@@ -1000,14 +1031,16 @@ class DNAMatchFinderApp:
             return
         sel = self.tree.selection()
         if not sel:
-            messagebox.showwarning("No selection", "Select a person from the list first.")
+            messagebox.showwarning(
+                "No selection", "Select a person from the list first.")
             return
         start_id = sel[0]
         try:
             top_n = int(self.top_n.get())
             max_depth = int(self.max_depth.get())
         except (tk.TclError, ValueError):
-            messagebox.showerror("Bad value", "Top N and Max depth must be integers.")
+            messagebox.showerror(
+                "Bad value", "Top N and Max depth must be integers.")
             return
         results = bfs_find_dna_matches(
             start_id, self.individuals, self.families,
@@ -1022,7 +1055,8 @@ class DNAMatchFinderApp:
             return
         sel = self.tree.selection()
         if not sel:
-            messagebox.showwarning("No selection", "Select a person from the list first.")
+            messagebox.showwarning(
+                "No selection", "Select a person from the list first.")
             return
         indi_id = sel[0]
         indi = self.individuals[indi_id]
@@ -1032,7 +1066,8 @@ class DNAMatchFinderApp:
         win.geometry("700x520")
         win.minsize(400, 300)
 
-        text = scrolledtext.ScrolledText(win, font=('Courier', 10), wrap='none', padx=8, pady=8)
+        text = scrolledtext.ScrolledText(win, font=(
+            'Courier', 10), wrap='none', padx=8, pady=8)
         text.pack(fill='both', expand=True)
 
         lines = []
@@ -1050,7 +1085,8 @@ class DNAMatchFinderApp:
 
         btn_frame = ttk.Frame(win)
         btn_frame.pack(fill='x', pady=(4, 8))
-        ttk.Button(btn_frame, text="Close", command=win.destroy).pack(side='right', padx=8)
+        ttk.Button(btn_frame, text="Close", command=win.destroy).pack(
+            side='right', padx=8)
 
     def _render_results(self, start_id, results):
         start = self.individuals[start_id]
@@ -1063,12 +1099,14 @@ class DNAMatchFinderApp:
         lines.append("")
 
         if not results:
-            lines.append("No DNA-flagged relatives found within the search depth.")
+            lines.append(
+                "No DNA-flagged relatives found within the search depth.")
         else:
             for rank, (dist, path) in enumerate(results, 1):
                 end_id = path[-1][0]
                 end = self.individuals[end_id]
-                lines.append(f"#{rank}: {describe(end)}    (distance: {dist} edges)")
+                lines.append(
+                    f"#{rank}: {describe(end)}    (distance: {dist} edges)")
                 lines.append("   DNA markers:")
                 for m in end['dna_markers']:
                     lines.append(f"     - {m}")
@@ -1107,9 +1145,11 @@ class DNAMatchFinderApp:
         win = tk.Toplevel(self.root)
         win.title("_MTTAG definitions")
         win.geometry("450x400")
-        text = scrolledtext.ScrolledText(win, font=('Courier', 10), wrap='none')
+        text = scrolledtext.ScrolledText(
+            win, font=('Courier', 10), wrap='none')
         text.pack(fill='both', expand=True)
-        lines = [f"{tid}\t{name}" for tid, name in sorted(self.tag_records.items())]
+        lines = [f"{tid}\t{name}" for tid,
+                 name in sorted(self.tag_records.items())]
         text.insert('1.0', '\n'.join(lines))
         text.configure(state='disabled')
 
@@ -1138,7 +1178,8 @@ class DNAMatchFinderApp:
         search_frame.pack(fill='x')
         ttk.Label(search_frame, text="Search:").pack(side='left', padx=(0, 4))
         search_var = tk.StringVar()
-        ttk.Entry(search_frame, textvariable=search_var).pack(side='left', fill='x', expand=True)
+        ttk.Entry(search_frame, textvariable=search_var).pack(
+            side='left', fill='x', expand=True)
 
         list_frame = ttk.Frame(dialog, padding=(8, 0, 8, 0))
         list_frame.pack(fill='both', expand=True)
@@ -1159,7 +1200,8 @@ class DNAMatchFinderApp:
         picker_tree.column('id', width=90, anchor='w', stretch=False)
         picker_tree.tag_configure('flagged_row', background='#fff4cc')
 
-        ysb = ttk.Scrollbar(list_frame, orient='vertical', command=picker_tree.yview)
+        ysb = ttk.Scrollbar(list_frame, orient='vertical',
+                            command=picker_tree.yview)
         picker_tree.configure(yscrollcommand=ysb.set)
         picker_tree.pack(side='left', fill='both', expand=True)
         ysb.pack(side='right', fill='y')
@@ -1176,7 +1218,8 @@ class DNAMatchFinderApp:
                 if query_tokens:
                     all_names = indi['alt_names'] or [indi['name']]
                     if not (
-                        any(all(tok in name.lower() for tok in query_tokens) for name in all_names)
+                        any(all(tok in name.lower() for tok in query_tokens)
+                            for name in all_names)
                         or query_l in indi_id.lower()
                     ):
                         continue
@@ -1184,7 +1227,8 @@ class DNAMatchFinderApp:
                 flagged_mark = '✓' if indi['dna_markers'] else ''
                 picker_tree.insert(
                     '', 'end', iid=indi_id,
-                    values=(indi['name'] or '(unknown)', lifespan(indi), flagged_mark, indi_id),
+                    values=(indi['name'] or '(unknown)',
+                            lifespan(indi), flagged_mark, indi_id),
                     tags=tags,
                 )
                 shown += 1
@@ -1210,8 +1254,10 @@ class DNAMatchFinderApp:
 
         btn_frame = ttk.Frame(dialog, padding=8)
         btn_frame.pack(fill='x')
-        ttk.Button(btn_frame, text="Select", command=select).pack(side='right', padx=(4, 0))
-        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side='right')
+        ttk.Button(btn_frame, text="Select", command=select).pack(
+            side='right', padx=(4, 0))
+        ttk.Button(btn_frame, text="Cancel",
+                   command=dialog.destroy).pack(side='right')
 
         dialog.wait_window()
         return result[0]
@@ -1242,7 +1288,8 @@ class DNAMatchFinderApp:
             start_id, target_id, self.individuals, self.families,
             top_n=top_n, max_depth=max_depth,
         )
-        self._last_result = {'type': 'path', 'start_id': start_id, 'end_id': target_id}
+        self._last_result = {'type': 'path',
+                             'start_id': start_id, 'end_id': target_id}
         self._render_path_results(start_id, target_id, paths, truncated)
 
     def _render_path_results(self, start_id, end_id, paths, truncated=False):
@@ -1261,13 +1308,16 @@ class DNAMatchFinderApp:
                 f"No relationship path found within max depth {self.max_depth.get()}."
             )
         else:
-            ancestors = get_ancestor_depths(start_id, self.individuals, self.families)
-            descendants = get_descendant_depths(start_id, self.individuals, self.families)
+            ancestors = get_ancestor_depths(
+                start_id, self.individuals, self.families)
+            descendants = get_descendant_depths(
+                start_id, self.individuals, self.families)
             for rank, path in enumerate(paths, 1):
                 dist = len(path) - 1
                 rel = describe_relationship(path, self.individuals,
                                             ancestors=ancestors, descendants=descendants)
-                lines.append(f"Path #{rank} — {rel} ({dist} edge{'s' if dist != 1 else ''}):")
+                lines.append(
+                    f"Path #{rank} — {rel} ({dist} edge{'s' if dist != 1 else ''}):")
                 for i, (node_id, edge) in enumerate(path):
                     indi = self.individuals[node_id]
                     if i == 0:
@@ -1290,12 +1340,14 @@ class DNAMatchFinderApp:
     # ---------------------------------------------------------- History / config
     def _config_path(self):
         if sys.platform == 'win32':
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("com.ajkessel.gedcom-dna-finder")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "com.ajkessel.gedcom-dna-finder")
             base = Path(os.environ.get('APPDATA', Path.home()))
         elif sys.platform == 'darwin':
             base = Path.home() / 'Library' / 'Application Support'
         else:
-            base = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+            base = Path(os.environ.get(
+                'XDG_CONFIG_HOME', Path.home() / '.config'))
         return base / 'gedcom-dna-finder' / 'settings.json'
 
     def _load_history(self):
@@ -1308,7 +1360,8 @@ class DNAMatchFinderApp:
     def _save_history(self, history):
         cfg = self._config_path()
         cfg.parent.mkdir(parents=True, exist_ok=True)
-        cfg.write_text(json.dumps({'recent_files': history}, indent=2), encoding='utf-8')
+        cfg.write_text(json.dumps(
+            {'recent_files': history}, indent=2), encoding='utf-8')
 
     def _add_to_history(self, filepath):
         history = [filepath] + [p for p in self._recent_files if p != filepath]
@@ -1343,7 +1396,8 @@ class DNAMatchFinderApp:
         return os.path.join(base, filename)
 
     def _show_how_to_use(self):
-        self._show_file_window("How to use", self._resource_path('HELP.md'), markdown=True)
+        self._show_file_window(
+            "How to use", self._resource_path('HELP.md'), markdown=True)
 
     def _show_about(self):
         self._show_file_window(
@@ -1358,7 +1412,8 @@ class DNAMatchFinderApp:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = preamble + f.read()
         except OSError as e:
-            messagebox.showerror("File not found", f"Could not open:\n{filepath}\n\n{e}")
+            messagebox.showerror(
+                "File not found", f"Could not open:\n{filepath}\n\n{e}")
             return
 
         win = tk.Toplevel(self.root)
@@ -1384,14 +1439,18 @@ class DNAMatchFinderApp:
         family = info['family']
         size = abs(info['size']) or 10
 
-        widget.tag_configure('h1', font=(family, size + 7, 'bold'), spacing1=10, spacing3=5)
-        widget.tag_configure('h2', font=(family, size + 4, 'bold'), spacing1=8, spacing3=4)
-        widget.tag_configure('h3', font=(family, size + 2, 'bold'), spacing1=6, spacing3=3)
+        widget.tag_configure('h1', font=(
+            family, size + 7, 'bold'), spacing1=10, spacing3=5)
+        widget.tag_configure('h2', font=(
+            family, size + 4, 'bold'), spacing1=8, spacing3=4)
+        widget.tag_configure('h3', font=(
+            family, size + 2, 'bold'), spacing1=6, spacing3=3)
         widget.tag_configure('bold', font=(family, size, 'bold'))
         widget.tag_configure('italic', font=(family, size, 'italic'))
-        widget.tag_configure('code_inline', font=('Courier', size - 1), background='#f0f0f0')
+        widget.tag_configure('code_inline', font=(
+            'Courier', size - 1), background='#f0f0f0')
         widget.tag_configure('code_block', font=('Courier', size - 1), background='#f0f0f0',
-                              lmargin1=16, lmargin2=16, spacing1=1, spacing3=1)
+                             lmargin1=16, lmargin2=16, spacing1=1, spacing3=1)
         widget.tag_configure('link', foreground='#0066cc')
         widget.tag_configure('bullet', lmargin1=16, lmargin2=32)
         widget.tag_configure('normal', font=(family, size))
@@ -1408,7 +1467,8 @@ class DNAMatchFinderApp:
             # Fenced code block toggle
             if stripped.startswith('```'):
                 if in_code:
-                    widget.insert('end', '\n'.join(code_acc) + '\n', 'code_block')
+                    widget.insert('end', '\n'.join(
+                        code_acc) + '\n', 'code_block')
                     code_acc = []
                     in_code = False
                 else:
@@ -1429,7 +1489,8 @@ class DNAMatchFinderApp:
             # ATX headers (up to ###)
             hm = re.match(r'^(#{1,3})\s+(.*)', stripped)
             if hm:
-                self._insert_inline(widget, hm.group(2), 'h' + str(len(hm.group(1))))
+                self._insert_inline(widget, hm.group(
+                    2), 'h' + str(len(hm.group(1))))
                 widget.insert('end', '\n')
                 i += 1
                 continue
@@ -1445,7 +1506,8 @@ class DNAMatchFinderApp:
                 cells = [c.strip() for c in stripped[1:-1].split('|')]
                 is_header = (i + 1 < len(lines) and
                              re.match(r'^\|[\s\-:|]+\|$', lines[i + 1].strip()))
-                self._insert_inline(widget, '  '.join(cells), 'bold' if is_header else 'normal')
+                self._insert_inline(widget, '  '.join(
+                    cells), 'bold' if is_header else 'normal')
                 widget.insert('end', '\n')
                 i += 1
                 continue
@@ -1461,7 +1523,8 @@ class DNAMatchFinderApp:
             # Numbered list
             nm = re.match(r'^(\d+\.)\s+(.*)', stripped)
             if nm:
-                self._insert_inline(widget, nm.group(1) + ' ' + nm.group(2), 'bullet')
+                self._insert_inline(widget, nm.group(
+                    1) + ' ' + nm.group(2), 'bullet')
                 widget.insert('end', '\n')
                 i += 1
                 continue

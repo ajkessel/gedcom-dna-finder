@@ -1,10 +1,11 @@
 #!/bin/bash
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."
 [[ -e dist/ ]] && rm -r dist/
 [[ -e gedcom-dna-finder-gui.py ]] || {
-  echo 'Build files not found.'
-  exit 1
+	echo 'Build files not found.'
+	exit 1
 }
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
