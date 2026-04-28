@@ -26,11 +26,13 @@ __version__ = "0.0.7"
 __release_date__ = "2026-04-28"
 
 import argparse
+import hashlib
 import heapq
 import ctypes
 import difflib
 import json
 import os
+import pickle
 import re
 import sys
 import tempfile
@@ -802,8 +804,9 @@ class DNAMatchFinderApp:
 
         search_frame = ttk.Frame(left)
         search_frame.pack(fill='x')
-        ttk.Label(search_frame, text="Search:").pack(side='left', padx=(0, 4))
-        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_text)
+        ttk.Label(search_frame, text="Find:", underline=0).pack(side='left', padx=(0, 4))
+        self.search_entry = ttk.Entry(
+            search_frame, textvariable=self.search_text)
         self.search_entry.pack(side='left', fill='x', expand=True)
         ttk.Checkbutton(
             search_frame, text="DNA-flagged only", variable=self.show_flagged_only
@@ -916,6 +919,22 @@ class DNAMatchFinderApp:
             messagebox.showerror("Not found", f"File not found:\n{path}")
             return
 
+        # --- Try cache first ---
+        cached = self._load_from_cache(path)
+        if cached:
+            self.individuals, self.families, self.tag_records = cached
+            self.sorted_ids = sorted(
+                self.individuals.keys(),
+                key=lambda iid: (self.individuals[iid]['name'].lower(), iid),
+            )
+            self._add_to_history(path)
+            self._home_person_id = self._load_home_person(path)
+            self._populate_tree()
+            self.status_text.set(
+                f"Loaded {len(self.individuals):,} individuals (from cache).")
+            return
+
+        # --- Full parse ---
         gedcom_path = path
         tmp_path = None
         if path.lower().endswith('.zip'):
@@ -957,6 +976,8 @@ class DNAMatchFinderApp:
         self.root.config(cursor="")
         self._add_to_history(path)
         self._home_person_id = self._load_home_person(path)
+        self._save_to_cache(path, self.individuals, self.families,
+                            self.tag_records)
         self._populate_tree()
 
     def _on_settings_change(self, *_):
@@ -1477,6 +1498,52 @@ class DNAMatchFinderApp:
         self.path_combo['values'] = history
         self._save_history(history)
 
+    # ---------------------------------------------------------- Cache
+    def _cache_dir(self):
+        return self._config_path().parent / 'cache'
+
+    def _cache_path(self, gedcom_path):
+        key = os.path.normcase(os.path.abspath(gedcom_path)).encode()
+        return self._cache_dir() / (hashlib.md5(key).hexdigest() + '.pkl')
+
+    def _load_from_cache(self, gedcom_path):
+        """Return (individuals, families, tag_records) from cache, or None on miss."""
+        try:
+            cache_file = self._cache_path(gedcom_path)
+            if not cache_file.exists():
+                return None
+            file_mtime = os.path.getmtime(gedcom_path)
+            with cache_file.open('rb') as f:
+                data = pickle.load(f)
+            if (data.get('mtime') != file_mtime
+                    or data.get('dna_keyword') != self.tag_keyword.get()
+                    or data.get('page_marker') != self.page_marker.get()):
+                return None
+            return data['individuals'], data['families'], data['tag_records']
+        except Exception:
+            return None
+
+    def _save_to_cache(self, gedcom_path, individuals, families, tag_records):
+        """Write parsed model to cache using an atomic temp-file rename."""
+        try:
+            cache_dir = self._cache_dir()
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_file = self._cache_path(gedcom_path)
+            payload = {
+                'mtime': os.path.getmtime(gedcom_path),
+                'dna_keyword': self.tag_keyword.get(),
+                'page_marker': self.page_marker.get(),
+                'individuals': individuals,
+                'families': families,
+                'tag_records': tag_records,
+            }
+            tmp = cache_file.with_suffix('.tmp')
+            with tmp.open('wb') as f:
+                pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
+            tmp.replace(cache_file)
+        except Exception:
+            pass  # cache write failure is non-fatal
+
     def _load_home_person(self, gedcom_path):
         """Return the stored home-person ID for this GEDCOM file, or None."""
         try:
@@ -1585,9 +1652,8 @@ class DNAMatchFinderApp:
     def _show_about(self):
         self._show_file_window(
             "About",
-            self._resource_path('LICENSE'),
-            markdown=False,
-            preamble=f"GEDCOM DNA Match Finder  v{__version__} ({__release_date__})\n\n",
+            self._resource_path('docs/LICENSE.md'), markdown=True,
+            preamble=f"# GEDCOM DNA Match Finder  v{__version__} ({__release_date__})\n\n",
         )
 
     def _show_file_window(self, title, filepath, markdown=False, preamble=""):
