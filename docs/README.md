@@ -306,7 +306,7 @@ This project is released under the BSD 2-Clause License. See the
 
 ## Recent changes
 
-See [`CHANGELOG.md`](CHANGELOG.md).
+See [`CHANGELOG`](CHANGELOG.md).
 
 ## Contributing
 
