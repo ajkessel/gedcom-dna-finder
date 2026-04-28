@@ -10,7 +10,7 @@ Downloads:
 * [Mac](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-mac.zip) (see [security note](#macos-security))
 * [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-linux.zip)
 
-![Main window](docs/screenshots/main-window.png)
+![Main window](screenshots/main-window.png)
 
 This is an alpha release. Only one person has tested it so far--me.
 
@@ -118,7 +118,7 @@ If the two people are very distantly related, you may need to increase
 the "Max Depth" setting to find the connection. The default max depth
 of 50 should find connections at least up to 4th cousins.
 
-![Relationship window](docs/screenshots/relationship-path.png)
+![Relationship window](screenshots/relationship-path.png)
 
 
 ### GUI
@@ -145,7 +145,7 @@ python gedcom-dna-finder-gui.py /path/to/tree.ged   # auto-loads on startup
 6. The right pane shows the closest flagged relative(s) and the
    relationship path from the selected person to each one.
 
-![Results pane showing a relationship path](docs/screenshots/results-pane.png)
+![Results pane showing a relationship path](screenshots/results-pane.png)
 
 The **View tag definitions...** button opens a window listing every
 `_MTTAG` record in the file with its name, which is useful for
@@ -281,7 +281,7 @@ public repository or create issues or provide feedback to this repository with a
 
 You may get a warning from Windows Defender that this is an unrecognized app from an unknown publisher. You can run the application by clicking first on "more info" and then "run anyway." It should only ask the first time you execute the software.
 
-![Windows Screenshot](docs/screenshots/windows-security.png)
+![Windows Screenshot](screenshots/windows-security.png)
 
 ## MacOS security
 
@@ -294,7 +294,7 @@ If you are on Mac and not running from the source code, you will have to tell th
 
 If you follow these steps and are seeing an error along the lines of "This file is damaged and can't be opened" it is typically because a false positive from your security settings. This can be fixed by opening the Terminal application (via Applications->Utilities or Spotlight search), typing `xattr -cr ` (with a space after `cr`) and then dragging and dropping the application ito the Terminal window and hitting enter. This will remove the "quarantine" setting on the application and allow you to run it again.
 
-![MacOS Screenshot](docs/screenshots/open_anyway.png)
+![MacOS Screenshot](screenshots/open_anyway.png)
 
 
 ## License
