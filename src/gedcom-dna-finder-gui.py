@@ -22,7 +22,7 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 __release_date__ = "2026-04-28"
 
 import argparse
@@ -788,7 +788,7 @@ class DNAMatchFinderApp:
         ttk.Entry(settings_frame, textvariable=self.page_marker,
                   width=30).grid(row=0, column=3, padx=(0, 16))
         ttk.Button(settings_frame, text="View tag definitions…",
-                   command=self._view_tags).grid(row=0, column=4, padx=4)
+                   underline=5, command=self._view_tags).grid(row=0, column=4, padx=4)
         ttk.Button(settings_frame, text="Find Relationship Path…",
                    command=self._find_path).grid(row=0, column=5, padx=(12, 4))
 
@@ -803,9 +803,8 @@ class DNAMatchFinderApp:
         search_frame = ttk.Frame(left)
         search_frame.pack(fill='x')
         ttk.Label(search_frame, text="Search:").pack(side='left', padx=(0, 4))
-        ttk.Entry(search_frame, textvariable=self.search_text).pack(
-            side='left', fill='x', expand=True
-        )
+        self.search_entry = ttk.Entry(search_frame, textvariable=self.search_text)
+        self.search_entry.pack(side='left', fill='x', expand=True)
         ttk.Checkbutton(
             search_frame, text="DNA-flagged only", variable=self.show_flagged_only
         ).pack(side='left', padx=(8, 0))
@@ -855,13 +854,16 @@ class DNAMatchFinderApp:
             side='left', padx=(2, 12)
         )
         ttk.Button(
-            action_frame, text="Find Nearest DNA Matches", command=self._find_matches
+            action_frame, text="Find Nearest DNA Matches", underline=5,
+            command=self._find_matches
         ).pack(side='right')
         ttk.Button(
-            action_frame, text="Show Person", command=self._show_person
+            action_frame, text="Show Person", underline=0,
+            command=self._show_person
         ).pack(side='right', padx=(0, 6))
         ttk.Button(
-            action_frame, text="Set Home", command=self._set_home_person
+            action_frame, text="Set Home", underline=4,
+            command=self._set_home_person
         ).pack(side='right', padx=(0, 4))
 
         # --- Right pane: results ---
@@ -871,10 +873,10 @@ class DNAMatchFinderApp:
         results_header = ttk.Frame(right)
         results_header.pack(fill='x')
         ttk.Label(results_header, text="Results:").pack(side='left')
-        ttk.Button(results_header, text="Copy",
+        ttk.Button(results_header, text="Copy", underline=0,
                    command=self._copy_results).pack(side='right')
-        ttk.Button(results_header, text="Clear", command=self._clear_results).pack(
-            side='right', padx=(0, 4))
+        ttk.Button(results_header, text="Clear", underline=1,
+                   command=self._clear_results).pack(side='right', padx=(0, 4))
 
         self.results = scrolledtext.ScrolledText(
             right, font=('Courier', 10), wrap='word', height=10
@@ -887,6 +889,8 @@ class DNAMatchFinderApp:
         status = ttk.Label(outer, textvariable=self.status_text,
                            relief='sunken', anchor='w')
         status.pack(fill='x', pady=(8, 0))
+
+        self._setup_keybindings()
 
     # ---------------------------------------------------------- Handlers
     def _browse(self):
@@ -1510,6 +1514,37 @@ class DNAMatchFinderApp:
         name = self.individuals[indi_id]['name'] or indi_id
         self.status_text.set(f"Home person set: {name}")
 
+    # ---------------------------------------------------------- Keybindings
+    def _setup_keybindings(self):
+        def bind(seq, cmd):
+            self.root.bind(seq, lambda _: cmd() or 'break')
+
+        bind('<Control-f>', self._kb_focus_search)
+        bind('<Control-d>', lambda: self.show_flagged_only.set(
+            not self.show_flagged_only.get()))
+        bind('<Control-u>', lambda: self.fuzzy_search.set(
+            not self.fuzzy_search.get()))
+        bind('<Control-p>', self._find_path)
+        bind('<Control-t>', self._view_tags)
+        bind('<Control-o>', self._browse)
+        bind('<Control-h>', self._set_home_person)
+        bind('<Control-s>', self._show_person)
+        bind('<Control-n>', self._find_matches)
+        bind('<Control-l>', self._clear_results)
+        # Ctrl-C: only invoke _copy_results when a Text widget isn't focused
+        # (Text widgets capture Ctrl-C themselves to copy selected text).
+        self.root.bind('<Control-c>', self._kb_copy)
+
+    def _kb_focus_search(self):
+        self.search_entry.focus_set()
+        self.search_entry.select_range(0, 'end')
+
+    def _kb_copy(self, *_):
+        if isinstance(self.root.focus_get(), tk.Text):
+            return  # let the text widget handle its own copy
+        self._copy_results()
+        return 'break'
+
     # ---------------------------------------------------------- Menu
     def _setup_menu(self):
         menubar = tk.Menu(self.root)
@@ -1518,6 +1553,8 @@ class DNAMatchFinderApp:
         app_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label='Menu', menu=app_menu)
         app_menu.add_command(label='How to use', command=self._show_how_to_use)
+        app_menu.add_command(label='Keyboard shortcuts',
+                             command=self._show_keyboard_shortcuts)
         app_menu.add_command(label='About', command=self._show_about)
 
         # macOS supplies Quit via Cmd+Q automatically; only add it explicitly elsewhere.
@@ -1539,6 +1576,11 @@ class DNAMatchFinderApp:
     def _show_how_to_use(self):
         self._show_file_window(
             "How to use", self._resource_path('docs/HELP.md'), markdown=True)
+
+    def _show_keyboard_shortcuts(self):
+        self._show_file_window(
+            "Keyboard shortcuts",
+            self._resource_path('docs/KEYBOARD_SHORTCUTS.md'), markdown=True)
 
     def _show_about(self):
         self._show_file_window(

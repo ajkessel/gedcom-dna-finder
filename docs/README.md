@@ -188,16 +188,16 @@ python gedcom-dna-finder-cli.py tree.ged "Jane Doe" --top 5 --max-depth 80
 
 #### Full CLI options
 
-| Flag                | Default              | Description                                                                |
-|---------------------|----------------------|----------------------------------------------------------------------------|
-| `--top`             | 3                    | Number of nearest matches to return.                                       |
-| `--max-depth`       | 50                   | Maximum BFS depth, in edges.                                               |
-| `--page-marker`     | `AncestryDNA Match`  | Substring to look for in source-citation `PAGE` text. Case-insensitive.    |
-| `--tag-keyword`     | `DNA`                | Substring to look for in `_MTTAG` `NAME` values. Case-insensitive.         |
-| `--fuzzy`           | off                  | Enable fuzzy name matching for typos and spelling variants.                |
-| `--fuzzy-threshold` | 0.6                  | Similarity cutoff for `--fuzzy`, between 0.0 and 1.0. Lower = more matches. |
-| `--list-tags`       |                      | Print all `_MTTAG` definitions in the file and exit.                       |
-| `--list-flagged`    |                      | Print every individual currently flagged as a DNA match and exit.          |
+| Flag                | Default             | Description                                                                 |
+| ------------------- | ------------------- | --------------------------------------------------------------------------- |
+| `--top`             | 3                   | Number of nearest matches to return.                                        |
+| `--max-depth`       | 50                  | Maximum BFS depth, in edges.                                                |
+| `--page-marker`     | `AncestryDNA Match` | Substring to look for in source-citation `PAGE` text. Case-insensitive.     |
+| `--tag-keyword`     | `DNA`               | Substring to look for in `_MTTAG` `NAME` values. Case-insensitive.          |
+| `--fuzzy`           | off                 | Enable fuzzy name matching for typos and spelling variants.                 |
+| `--fuzzy-threshold` | 0.6                 | Similarity cutoff for `--fuzzy`, between 0.0 and 1.0. Lower = more matches. |
+| `--list-tags`       |                     | Print all `_MTTAG` definitions in the file and exit.                        |
+| `--list-flagged`    |                     | Print every individual currently flagged as a DNA match and exit.           |
 
 ## Example output
 

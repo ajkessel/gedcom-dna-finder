@@ -350,7 +350,8 @@ def find_target(individuals, query, fuzzy=False, fuzzy_threshold=0.6, fuzzy_max=
         names = indi['alt_names'] or [indi['name']]
         return any(all(tok in name.lower() for tok in tokens) for name in names)
 
-    token_matches = [iid for iid, indi in individuals.items() if _token_match(indi)]
+    token_matches = [iid for iid, indi in individuals.items()
+                     if _token_match(indi)]
     token_matches.sort(key=lambda iid: individuals[iid]['name'].lower())
 
     if not fuzzy:
@@ -379,7 +380,8 @@ def find_target(individuals, query, fuzzy=False, fuzzy_threshold=0.6, fuzzy_max=
         if best_score >= fuzzy_threshold:
             fuzzy_candidates.append((best_score, iid))
 
-    fuzzy_candidates.sort(key=lambda x: (-x[0], individuals[x[1]]['name'].lower()))
+    fuzzy_candidates.sort(
+        key=lambda x: (-x[0], individuals[x[1]]['name'].lower()))
     fuzzy_candidates = fuzzy_candidates[:fuzzy_max]
 
     result = [(iid, None) for iid in token_matches]
@@ -449,7 +451,8 @@ def extract_ged_from_zip(zip_path):
             key=lambda n: (n.count('/'), n.lower()),
         )
         if not ged_names:
-            raise ValueError("No .ged or .gedcom file found inside the ZIP archive.")
+            raise ValueError(
+                "No .ged or .gedcom file found inside the ZIP archive.")
         chosen = ged_names[0]
         data = zf.read(chosen)
     tmp = tempfile.NamedTemporaryFile(suffix='.ged', delete=False)
@@ -556,7 +559,8 @@ def main():
         print(f'Multiple candidates match {args.target!r}:', file=sys.stderr)
         for cid, score in candidates[:25]:
             score_str = f'  [fuzzy: {score:.2f}]' if score is not None else ''
-            print(f'  {describe(individuals[cid])}{score_str}', file=sys.stderr)
+            print(
+                f'  {describe(individuals[cid])}{score_str}', file=sys.stderr)
         if len(candidates) > 25:
             print(f'  ... and {len(candidates) - 25} more', file=sys.stderr)
         print('Refine the query, or pass an exact INDI ID.', file=sys.stderr)

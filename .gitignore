@@ -1,5 +1,6 @@
 .claude/
 .venv/
+.vscode/
 venv/
 build/
 dist/

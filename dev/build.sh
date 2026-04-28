@@ -34,7 +34,7 @@ else
 fi
 [[ -e .venv/bin/activate ]] || {
 	echo 'Creating virtual environment...'
-	python3 -m venv .venv || {
+	python3 -m venv .venv --prompt "gedcom-dna-finder" || {
 		echo 'Failed to create virtual environment.'
 		exit 1
 	}
