@@ -277,7 +277,7 @@ public repository or create issues or provide feedback to this repository with a
 
 ## Windows security
 
-You may get a warning from Windows Defender that this is an unrecognized app from an unknown publisher. You can run the application by clicking first on "more info" and then "run away." It should only ask the first time you execute the software.
+You may get a warning from Windows Defender that this is an unrecognized app from an unknown publisher. You can run the application by clicking first on "more info" and then "run anyway." It should only ask the first time you execute the software.
 
 ![Windows Screenshot](docs/screenshots/windows-security.png)
 
