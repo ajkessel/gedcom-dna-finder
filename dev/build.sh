@@ -2,8 +2,8 @@
 command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."
-[[ -e dist/ ]] && rm -r dist/
-[[ -e gedcom-dna-finder-gui.py ]] || {
+[[ -e ./dist/ ]] && rm -r ./dist/
+[[ -e ./src/gedcom-dna-finder-gui.py ]] || {
 	echo 'Build files not found.'
 	exit 1
 }
@@ -44,7 +44,7 @@ source .venv/bin/activate || {
 	echo 'Failed to activate virtual environment.'
 	exit 1
 }
-pip install -r requirements.txt || {
+pip install -r ./dev/requirements.txt || {
 	echo 'Failed to install dependencies.'
 	exit 1
 }

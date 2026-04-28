@@ -23,10 +23,10 @@ if sys.platform == 'win32':
         _extra_binaries += [(p, '.') for p in glob.glob(_pat)]
 
 a = Analysis(
-    ['../gedcom-dna-finder-gui.py'],
+    ['../src/gedcom-dna-finder-gui.py'],
     pathex=[],
     binaries=_extra_binaries,
-    datas=[('../HELP.md', '.'), ('../LICENSE', '.'), ('../icons/family_tree.ico','./icons'), ('../icons/family_tree.png','./icons')],
+    datas=[('../docs/HELP.md', './docs'), ('../LICENSE', '.'), ('../icons/family_tree.ico','./icons'), ('../icons/family_tree.png','./icons')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
