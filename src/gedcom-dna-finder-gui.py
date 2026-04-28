@@ -1392,7 +1392,8 @@ class DNAMatchFinderApp:
         if getattr(sys, 'frozen', False):
             base = sys._MEIPASS
         else:
-            base = os.path.dirname(os.path.abspath(__file__))
+            # Assume resources are in the parent directory of the script (e.g. in a 'resources' folder), for source version only
+            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base, filename)
 
     def _show_how_to_use(self):
