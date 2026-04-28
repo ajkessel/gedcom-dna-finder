@@ -26,7 +26,7 @@ a = Analysis(
     ['../src/gedcom-dna-finder-gui.py'],
     pathex=[],
     binaries=_extra_binaries,
-    datas=[('../docs/HELP.md', './docs'), ('../LICENSE', '.'), ('../icons/family_tree.ico','./icons'), ('../icons/family_tree.png','./icons')],
+    datas=[('../docs/HELP.md', './docs'), ('../docs/LICENSE', '.'), ('../icons/family_tree.ico','./icons'), ('../icons/family_tree.png','./icons')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
