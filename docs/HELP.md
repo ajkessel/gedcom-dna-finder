@@ -19,7 +19,13 @@ Ancestry, Family Tree Maker, and standard GEDCOM viewers can show you
 a flat list of everyone you've tagged as a DNA match, but none of them
 will, given an arbitrary person in the tree, walk outward through the
 relationship graph and tell you the nearest tagged relative. That is
-what this tool does.
+the main purpose of this tool.
+
+As an added bonus, you can use this tool to find multiple paths between
+any two people in your tree and also view individual records from your
+tree. If you set a person as the "Home Person" using the "Set Home" button,
+the results will include the path from the selected person to the Home Person
+in addition to the closest people with DNA match markers.
 
 ## What it does
 

@@ -22,8 +22,8 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.5"
-__release_date__ = "2026-04-27"
+__version__ = "0.0.6"
+__release_date__ = "2026-04-28"
 
 import argparse
 import heapq
@@ -572,29 +572,52 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
     if not inner or lead_sp > 1 or trail_sp > 1 or (lead_sp and trail_sp):
         return chain()
 
-    # Validate inner: all-up → optional single sibling → all-down
-    state = 'up'
-    u = d = s = 0
-    valid = True
-    for e in inner:
-        if state == 'up':
-            if e in up_set:
-                u += 1
-            elif e == 'sibling':
-                s += 1
-                state = 'down'
-            elif e == 'child':
-                d += 1
-                state = 'down'
-            else:
-                valid = False
-                break
-        elif state == 'down':
-            if e == 'child':
-                d += 1
-            else:
-                valid = False
-                break
+    # Validate inner: all-up → optional single sibling → all-down.
+    # If the sequence fails because of interior spouse edges (path navigated
+    # through a family unit rather than directly), strip those spouse edges
+    # and retry — they don't change the fundamental relationship.
+    def _classify(seq):
+        st = 'up'
+        uu = dd = ss = 0
+        ok = True
+        for e in seq:
+            if st == 'up':
+                if e in up_set:
+                    uu += 1
+                elif e == 'sibling':
+                    ss += 1
+                    st = 'down'
+                elif e == 'child':
+                    dd += 1
+                    st = 'down'
+                else:
+                    ok = False
+                    break
+            elif st == 'down':
+                if e == 'child':
+                    dd += 1
+                else:
+                    ok = False
+                    break
+        return uu, dd, ss, ok
+
+    u, d, s, valid = _classify(inner)
+    if not valid:
+        # Retry 1: strip interior spouse edges (family-unit crossings that
+        # don't change the relationship degree).
+        no_sp = [e for e in inner if e != 'spouse']
+        if no_sp != inner:
+            u, d, s, valid = _classify(no_sp)
+        else:
+            no_sp = inner
+        # Retry 2: strip a trailing sibling edge.  The sibling of an Nth
+        # cousin / niece / uncle at a given degree is still at that same
+        # degree, so the relationship label is unchanged.  (Retry 1 must run
+        # first so no_sp is already spouse-free before we trim the tail.)
+        if not valid and no_sp and no_sp[-1] == 'sibling':
+            trimmed = no_sp[:-1]
+            if trimmed:
+                u, d, s, valid = _classify(trimmed)
     if not valid:
         return chain()
 
@@ -690,6 +713,7 @@ class DNAMatchFinderApp:
         self.tag_records = {}
         # all IDs sorted by name (computed once after load)
         self.sorted_ids = []
+        self._home_person_id = None   # persisted per GEDCOM file
 
         # UI state
         self.gedcom_path = tk.StringVar()
@@ -717,6 +741,14 @@ class DNAMatchFinderApp:
         self._recent_files = self._load_history()
 
         self._build_ui()
+
+        # Snap the initial window width up to what Tk actually needs so that
+        # all action-bar buttons are fully visible on first launch.
+        self.root.update_idletasks()
+        min_w = self.root.winfo_reqwidth()
+        if min_w > self.root.winfo_width():
+            self.root.geometry(f"{min_w}x{self.root.winfo_height()}")
+        self.root.minsize(max(min_w, 800), 500)
 
         # Re-open the most-recently-used file automatically on startup
         if self._recent_files and os.path.isfile(self._recent_files[0]):
@@ -828,6 +860,9 @@ class DNAMatchFinderApp:
         ttk.Button(
             action_frame, text="Show Person", command=self._show_person
         ).pack(side='right', padx=(0, 6))
+        ttk.Button(
+            action_frame, text="Set Home", command=self._set_home_person
+        ).pack(side='right', padx=(0, 4))
 
         # --- Right pane: results ---
         right = ttk.Frame(paned)
@@ -845,6 +880,7 @@ class DNAMatchFinderApp:
             right, font=('Courier', 10), wrap='word', height=10
         )
         self.results.pack(fill='both', expand=True, pady=(4, 0))
+        self.results.tag_configure('bold', font=('Courier', 10, 'bold'))
         self.results.configure(state='disabled')
 
         # Status bar
@@ -916,6 +952,7 @@ class DNAMatchFinderApp:
         )
         self.root.config(cursor="")
         self._add_to_history(path)
+        self._home_person_id = self._load_home_person(path)
         self._populate_tree()
 
     def _on_settings_change(self, *_):
@@ -1110,39 +1147,80 @@ class DNAMatchFinderApp:
             side='right', padx=8)
 
     def _render_results(self, start_id, results):
-        start = self.individuals[start_id]
+        # Each entry is (text, bold).
         lines = []
-        lines.append(f"Starting from: {describe(start)}")
+
+        def add(text, bold=False):
+            lines.append((text, bold))
+
+        start = self.individuals[start_id]
+        add(f"Starting from: {describe(start)}")
         if start['dna_markers']:
-            lines.append("  Note: this person is themselves DNA-flagged.")
+            add("  Note: this person is themselves DNA-flagged.")
             for m in start['dna_markers']:
-                lines.append(f"    - {m}")
-        lines.append("")
+                add(f"    - {m}")
+        add("")
 
         if not results:
-            lines.append(
-                "No DNA-flagged relatives found within the search depth.")
+            add("No DNA-flagged relatives found within the search depth.")
         else:
             for rank, (dist, path) in enumerate(results, 1):
                 end_id = path[-1][0]
                 end = self.individuals[end_id]
-                lines.append(
-                    f"#{rank}: {describe(end)}    (distance: {dist} edges)")
-                lines.append("   DNA markers:")
+                add(f"#{rank}: {describe(end)}    (distance: {dist} edges)",
+                    bold=True)
+                add("   DNA markers:")
                 for m in end['dna_markers']:
-                    lines.append(f"     - {m}")
-                lines.append("   Path:")
+                    add(f"     - {m}")
+                add("   Path:")
                 for i, (node_id, edge) in enumerate(path):
                     indi = self.individuals[node_id]
                     if i == 0:
-                        lines.append(f"     {describe(indi)}")
+                        add(f"     {describe(indi)}")
                     else:
-                        lines.append(f"       --[{edge}]--> {describe(indi)}")
-                lines.append("")
+                        add(f"       --[{edge}]--> {describe(indi)}")
+                add("")
+
+        # Home person relationship
+        home_id = self._home_person_id
+        if home_id and home_id != start_id and home_id in self.individuals:
+            home = self.individuals[home_id]
+            add("── Path to Home Person ──", bold=True)
+            add(f"Home: {describe(home)}")
+            try:
+                max_depth = int(self.max_depth.get())
+            except (tk.TclError, ValueError):
+                max_depth = 50
+            home_paths, _ = bfs_find_all_paths(
+                start_id, home_id, self.individuals, self.families,
+                top_n=1, max_depth=max_depth,
+            )
+            if not home_paths:
+                add("No path found to home person within the current max depth.")
+            else:
+                path = home_paths[0]
+                ancestors = get_ancestor_depths(
+                    start_id, self.individuals, self.families)
+                descendants = get_descendant_depths(
+                    start_id, self.individuals, self.families)
+                rel = describe_relationship(
+                    path, self.individuals,
+                    ancestors=ancestors, descendants=descendants)
+                dist = len(path) - 1
+                add(f"Relationship: {rel} ({dist} edge{'s' if dist != 1 else ''})")
+                add("Path:")
+                for i, (node_id, edge) in enumerate(path):
+                    indi = self.individuals[node_id]
+                    if i == 0:
+                        add(f"  {describe(indi)}")
+                    else:
+                        add(f"    --[{edge}]--> {describe(indi)}")
+            add("")
 
         self.results.configure(state='normal')
         self.results.delete('1.0', 'end')
-        self.results.insert('1.0', '\n'.join(lines))
+        for text, bold in lines:
+            self.results.insert('end', text + '\n', 'bold' if bold else '')
         self.results.configure(state='disabled')
 
     def _copy_results(self):
@@ -1380,9 +1458,13 @@ class DNAMatchFinderApp:
 
     def _save_history(self, history):
         cfg = self._config_path()
+        try:
+            data = json.loads(cfg.read_text(encoding='utf-8'))
+        except Exception:
+            data = {}
+        data['recent_files'] = history
         cfg.parent.mkdir(parents=True, exist_ok=True)
-        cfg.write_text(json.dumps(
-            {'recent_files': history}, indent=2), encoding='utf-8')
+        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
 
     def _add_to_history(self, filepath):
         history = [filepath] + [p for p in self._recent_files if p != filepath]
@@ -1390,6 +1472,43 @@ class DNAMatchFinderApp:
         self._recent_files = history
         self.path_combo['values'] = history
         self._save_history(history)
+
+    def _load_home_person(self, gedcom_path):
+        """Return the stored home-person ID for this GEDCOM file, or None."""
+        try:
+            data = json.loads(self._config_path().read_text(encoding='utf-8'))
+            return data.get('home_persons', {}).get(gedcom_path)
+        except Exception:
+            return None
+
+    def _save_home_person(self, gedcom_path, indi_id):
+        """Persist the home-person ID for this GEDCOM file."""
+        cfg = self._config_path()
+        try:
+            data = json.loads(cfg.read_text(encoding='utf-8'))
+        except Exception:
+            data = {}
+        data.setdefault('home_persons', {})[gedcom_path] = indi_id
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+
+    def _set_home_person(self):
+        if not self.individuals:
+            messagebox.showwarning("No data", "Load a GEDCOM file first.")
+            return
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showwarning(
+                "No selection", "Select a person from the list first.")
+            return
+        indi_id = sel[0]
+        gedcom_path = self.gedcom_path.get().strip()
+        if not gedcom_path:
+            return
+        self._home_person_id = indi_id
+        self._save_home_person(gedcom_path, indi_id)
+        name = self.individuals[indi_id]['name'] or indi_id
+        self.status_text.set(f"Home person set: {name}")
 
     # ---------------------------------------------------------- Menu
     def _setup_menu(self):
