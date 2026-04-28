@@ -171,7 +171,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
                             break
                 elif tag == 'PAGE' and page_marker_l and page_marker_l in value.lower():
                     indi['dna_markers'].append(
-                        f'Source citation PAGE: "{value.strip()}"'
+                        f'Source citation: "{value.strip()}"'
                     )
             individuals[head_xref] = indi
 
@@ -191,7 +191,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
         for ref in indi.pop('_mttag_refs'):
             tag_name = tag_records.get(ref, '')
             if tag_name and dna_kw_l in tag_name.lower():
-                indi['dna_markers'].append(f'_MTTAG: {tag_name} ({ref})')
+                indi['dna_markers'].append(f'Tags: {tag_name} ({ref})')
 
     return individuals, families, tag_records
 
@@ -437,6 +437,22 @@ _REMOVALS = {1: 'once', 2: 'twice', 3: 'three times',
              4: 'four times', 5: 'five times'}
 
 
+def _nth_great(n):
+    """Return 'great-' for n==1, '2nd-great-' for n==2, '3rd-great-' for n==3, etc.
+
+    n==0 returns ''. Used to build compact ancestor/descendant labels.
+    """
+    if n == 0:
+        return ''
+    if n == 1:
+        return 'great-'
+    if 11 <= n % 100 <= 13:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+    return f'{n}{suffix}-great-'
+
+
 def get_ancestor_depths(start_id, individuals, families):
     """BFS over father/mother edges only → {ancestor_id: depth from start}."""
     depths = {}
@@ -512,14 +528,14 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
             return 'father' if sex == 'M' else ('mother' if sex == 'F' else 'parent')
         gp = 'grandfather' if sex == 'M' else (
             'grandmother' if sex == 'F' else 'grandparent')
-        return 'great-' * (n - 2) + gp
+        return _nth_great(n - 2) + gp
 
     def descendant_term(n, sex):
         if n == 1:
             return 'son' if sex == 'M' else ('daughter' if sex == 'F' else 'child')
         gc = 'grandson' if sex == 'M' else (
             'granddaughter' if sex == 'F' else 'grandchild')
-        return 'great-' * (n - 2) + gc
+        return _nth_great(n - 2) + gc
 
     # If the target is a known biological ancestor/descendant, use the direct
     # label regardless of the (possibly indirect) path being examined.  This
@@ -611,7 +627,7 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
             core = 'uncle' if target_sex == 'M' else (
                 'aunt' if target_sex == 'F' else 'uncle/aunt')
         if rem > 1:
-            core = 'great-' * (rem - 1) + core
+            core = _nth_great(rem - 1) + core
     else:
         n_str = _ORDINALS[cn] if cn < len(_ORDINALS) else f'{cn}th'
         r_str = _REMOVALS.get(rem, f'{rem} times')
@@ -701,6 +717,11 @@ class DNAMatchFinderApp:
         self._recent_files = self._load_history()
 
         self._build_ui()
+
+        # Re-open the most-recently-used file automatically on startup
+        if self._recent_files and os.path.isfile(self._recent_files[0]):
+            self.gedcom_path.set(self._recent_files[0])
+            self.root.after(0, self._load_file)
 
     # ---------------------------------------------------------- UI build
     def _build_ui(self):
