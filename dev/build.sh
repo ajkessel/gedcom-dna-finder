@@ -16,6 +16,7 @@ if [[ $(uname) == "Linux" ]]; then
 	}
 else
 	echo 'Building for macOS...'
+  export PATH="/usr/local/bin:$PATH"
   command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
   export PYENV_ROOT="$HOME/.pyenv"
   [[ -e "${PYENV_ROOT}/shims/python3.14" ]] || {
