@@ -1,5 +1,4 @@
 #!/bin/bash
-command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."
 [[ -e ./dist/ ]] && rm -r ./dist/
