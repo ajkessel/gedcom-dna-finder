@@ -808,6 +808,7 @@ class DNAMatchFinderApp:
         self.search_entry = ttk.Entry(
             search_frame, textvariable=self.search_text)
         self.search_entry.pack(side='left', fill='x', expand=True)
+        self.search_entry.bind('<Return>', lambda _: self._kb_focus_list())
         ttk.Checkbutton(
             search_frame, text="DNA-flagged only", variable=self.show_flagged_only
         ).pack(side='left', padx=(8, 0))
@@ -835,6 +836,7 @@ class DNAMatchFinderApp:
 
         ysb = ttk.Scrollbar(list_frame, orient='vertical',
                             command=self.tree.yview)
+        ysb.configure(takefocus=False)
         self.tree.configure(yscrollcommand=ysb.set)
         self.tree.pack(side='left', fill='both', expand=True)
         ysb.pack(side='right', fill='y')
@@ -849,25 +851,26 @@ class DNAMatchFinderApp:
         action_frame = ttk.Frame(left)
         action_frame.pack(fill='x', pady=(6, 0))
         ttk.Label(action_frame, text="Top N:").pack(side='left')
-        ttk.Spinbox(action_frame, from_=1, to=20, textvariable=self.top_n, width=4).pack(
-            side='left', padx=(2, 12)
-        )
+        self.top_n_spin = ttk.Spinbox(action_frame, from_=1, to=20, textvariable=self.top_n, width=4)
+        self.top_n_spin.pack(side='left', padx=(2, 12))
         ttk.Label(action_frame, text="Max depth:").pack(side='left')
-        ttk.Spinbox(action_frame, from_=1, to=200, textvariable=self.max_depth, width=4).pack(
-            side='left', padx=(2, 12)
-        )
-        ttk.Button(
+        self.max_depth_spin = ttk.Spinbox(action_frame, from_=1, to=200, textvariable=self.max_depth, width=4)
+        self.max_depth_spin.pack(side='left', padx=(2, 12))
+        self.find_matches_btn = ttk.Button(
             action_frame, text="Find Nearest DNA Matches", underline=5,
             command=self._find_matches
-        ).pack(side='right')
-        ttk.Button(
+        )
+        self.find_matches_btn.pack(side='right')
+        self.show_person_btn = ttk.Button(
             action_frame, text="Show Person", underline=0,
             command=self._show_person
-        ).pack(side='right', padx=(0, 6))
-        ttk.Button(
+        )
+        self.show_person_btn.pack(side='right', padx=(0, 6))
+        self.set_home_btn = ttk.Button(
             action_frame, text="Set Home", underline=4,
             command=self._set_home_person
-        ).pack(side='right', padx=(0, 4))
+        )
+        self.set_home_btn.pack(side='right', padx=(0, 4))
 
         # --- Right pane: results ---
         right = ttk.Frame(paned)
@@ -1259,6 +1262,9 @@ class DNAMatchFinderApp:
         self.results.configure(state='normal')
         self.results.delete('1.0', 'end')
         self.results.configure(state='disabled')
+        self.search_text.set('')
+        self._last_result = None
+        self._kb_focus_search()
 
     def _view_tags(self):
         if not self.tag_records:
@@ -1598,13 +1604,35 @@ class DNAMatchFinderApp:
         bind('<Control-s>', self._show_person)
         bind('<Control-n>', self._find_matches)
         bind('<Control-l>', self._clear_results)
+        bind('<Escape>', self._clear_results)
         # Ctrl-C: only invoke _copy_results when a Text widget isn't focused
         # (Text widgets capture Ctrl-C themselves to copy selected text).
         self.root.bind('<Control-c>', self._kb_copy)
 
+        # Explicit tab chain: tree → results → top_n → max_depth → set_home → show_person → find_matches
+        self.results.configure(takefocus=True)
+        tab_chain = [
+            self.tree, self.results,
+            self.top_n_spin, self.max_depth_spin,
+            self.set_home_btn, self.show_person_btn, self.find_matches_btn,
+        ]
+        for i, w in enumerate(tab_chain):
+            nxt = tab_chain[(i + 1) % len(tab_chain)]
+            prv = tab_chain[(i - 1) % len(tab_chain)]
+            w.bind('<Tab>', lambda _, nw=nxt: nw.focus_set() or 'break')
+            w.bind('<Shift-Tab>', lambda _, pw=prv: pw.focus_set() or 'break')
+
     def _kb_focus_search(self):
         self.search_entry.focus_set()
         self.search_entry.select_range(0, 'end')
+
+    def _kb_focus_list(self):
+        self.tree.focus_set()
+        if not self.tree.focus():
+            children = self.tree.get_children()
+            if children:
+                self.tree.focus(children[0])
+                self.tree.selection_set(children[0])
 
     def _kb_copy(self, *_):
         if isinstance(self.root.focus_get(), tk.Text):
