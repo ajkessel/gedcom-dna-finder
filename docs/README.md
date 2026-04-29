@@ -1,7 +1,9 @@
 # GEDCOM DNA Finder
 
-Find the closest DNA-flagged relative to any person in a GEDCOM family
-tree, show an arbitrary number of paths between any two people in your tree, or rapidly search your tree for variations on names and other information like geographical locations.
+* Find the closest DNA-flagged relative to any person in a GEDCOM family
+tree
+* Show multiple paths between any two people in your tree
+* Rapidly search your tree for variations on names and other information like geographical locations
 
 Available as a graphical tool as well as a command-line version.
 
