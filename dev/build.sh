@@ -8,64 +8,11 @@ cd "${SCRIPT_DIR}/.."
 }
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
-	out="gedcom-dna-finder-linux.zip"
-else
+  dev/build-linux.sh
+elif [[ $(uname) == "Darwin" ]]; then
 	echo 'Building for macOS...'
-  export PATH="/usr/local/bin:$PATH"
-  command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH" || {
-    echo 'homebrew not found, we will still try to build but this script has not been tested on MacOS without brew.'
-  }
-  command -v pyenv || {
-    echo 'pyenv missing, attempting to install from homebrew...'
-    brew install pyenv
-  }
-  export PYENV_ROOT="$HOME/.pyenv"
-  [[ -e "${PYENV_ROOT}/shims/python3.14" ]] || {
-    echo 'Installing pyenv for python 3.14.4'
-    mkdir -p "${PYENV_ROOT}"
-    eval "$(pyenv init -)"
-    pyenv install 3.14.4
-    pyenv global 3.14.4
-  }
-  eval "$(pyenv init -)"
-	out="gedcom-dna-finder-mac.zip"
-	./dev/generate_icns.sh ./icons/family_tree.png || {
-		echo 'Failed to generate ICNS file.'
-		exit 1
-	}
+  dev/build-mac.sh
+else
+  echo 'Platform not recognized. Exiting.'
+  exit 1
 fi
-[[ -e .venv/bin/activate ]] || {
-	echo 'Creating virtual environment...'
-	python3 -m venv .venv --prompt "gedcom-dna-finder" || {
-		echo 'Failed to create virtual environment.'
-		exit 1
-	}
-}
-source .venv/bin/activate || {
-	echo 'Failed to activate virtual environment.'
-	exit 1
-}
-pip install -r ./dev/requirements.txt || {
-	echo 'Failed to install dependencies.'
-	exit 1
-}
-python3 ./dev/generate_icon.py ./icons/family_tree.png || {
-	echo 'Failed to generate ICO file.'
-	exit 1
-}
-pyinstaller --noconfirm ./dev/gedcom-dna-finder-cli.spec || {
-	echo 'pyinstaller failed to build CLI.'
-	exit 1
-}
-pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
-	echo 'pyinstaller failed to build GUI.'
-	exit 1
-}
-[ -d "dist" ] || {
-	echo 'Cannot find dist build folder.'
-	exit 1
-}
-pushd dist
-zip -r "../${out}" .
-mv "../${out}" .
-popd

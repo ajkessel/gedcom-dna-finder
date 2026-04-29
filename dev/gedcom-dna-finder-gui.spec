@@ -104,43 +104,28 @@ if sys.platform == 'darwin':
                  icon='../icons/family_tree.icns',
                  bundle_identifier='com.ajkessel.gedcom-dna-finder')
 
-    # Re-sign the fully-assembled bundle so the CodeResources seal matches the
-    # final layout.  PyInstaller signs the inner EXE before COLLECT/BUNDLE run,
-    # leaving the bundle-level signature out of sync.
-    #
-    # --deep is intentionally avoided: it does not descend into loose .dylib /
-    # .so files in Contents/MacOS, so those end up included in the outer seal
-    # while unsigned, causing "a sealed resource is missing or invalid".
-    # Instead, sign every shared library explicitly first (inside-out), then
-    # seal the outer bundle in a single final pass.
-    _identity = check_codesigning_key()
-    if _identity:
-        _app_path = os.path.join(DISTPATH, 'gedcom-dna-finder.app')
-        _entitlements = os.path.join(SPECPATH, 'entitlements.plist')
-        _sign_base = ['codesign', '--force', '--timestamp',
-                      '--sign', _identity, '--options=runtime']
-
-        for _pattern in ('**/*.dylib', '**/*.so'):
-            for _lib in glob.glob(
-                    os.path.join(_app_path, _pattern), recursive=True):
-                subprocess.run(_sign_base + [_lib], check=True)
-
-        subprocess.run(
-            _sign_base + ['--entitlements', _entitlements, _app_path],
-            check=True,
-        )
-
-        # Package for distribution using ditto, which preserves the symlinks
-        # that PyInstaller places inside the bundle.  Regular zip (Finder,
-        # command-line zip, GitHub upload-artifact) resolves symlinks into real
-        # files/directories, which invalidates the CodeResources seal and causes
-        # "a sealed resource is missing or invalid" on the recipient's machine.
-        _zip_path = os.path.join(DISTPATH, 'gedcom-dna-finder-mac.zip')
-        subprocess.run(
-            [
-                'ditto', '-c', '-k', '--sequesterRsrc', '--keepParent',
-                _app_path, _zip_path,
-            ],
-            check=True,
-        )
-        print(f'Distribution archive: {_zip_path}')
+#    # Re-sign the fully-assembled bundle so the CodeResources seal matches the
+#    # final layout.  PyInstaller signs the inner EXE before COLLECT/BUNDLE run,
+#    # leaving the bundle-level signature out of sync.
+#    #
+#    # --deep is intentionally avoided: it does not descend into loose .dylib /
+#    # .so files in Contents/MacOS, so those end up included in the outer seal
+#    # while unsigned, causing "a sealed resource is missing or invalid".
+#    # Instead, sign every shared library explicitly first (inside-out), then
+#    # seal the outer bundle in a single final pass.
+#    _identity = check_codesigning_key()
+#    if _identity:
+#        _app_path = os.path.join(DISTPATH, 'gedcom-dna-finder.app')
+#        _entitlements = os.path.join(SPECPATH, 'entitlements.plist')
+#        _sign_base = ['codesign', '--force', '--timestamp',
+#                      '--sign', _identity, '--options=runtime']
+#
+#        for _pattern in ('**/*.dylib', '**/*.so'):
+#            for _lib in glob.glob(
+#                    os.path.join(_app_path, _pattern), recursive=True):
+#                subprocess.run(_sign_base + [_lib], check=True)
+#
+#        subprocess.run(
+#            _sign_base + ['--entitlements', _entitlements, _app_path],
+#            check=True,
+#        )
