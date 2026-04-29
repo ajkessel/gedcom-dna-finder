@@ -700,6 +700,45 @@ class DNAMatchFinderApp:
         'medium': {'ui': 10, 'mono': 10},
         'large':  {'ui': 13, 'mono': 12},
     }
+    _THEME_NAMES = ('Default', 'Light', 'Dark', 'Blue', 'Green')
+    _THEMES = {
+        'Light': {
+            'ttk': 'clam',
+            'bg': '#f0f2f5', 'fg': '#1a1a1a',
+            'button_bg': '#dde1e7', 'field_bg': '#ffffff',
+            'text_bg': '#ffffff', 'text_fg': '#1a1a1a',
+            'select_bg': '#3d7ec7', 'select_fg': '#ffffff',
+            'heading_bg': '#d0d4db', 'trough': '#c5c9d0',
+            'flag_bg': '#fff4cc', 'link': '#1155bb', 'insert': '#1a1a1a',
+        },
+        'Dark': {
+            'ttk': 'clam',
+            'bg': '#2b2b2b', 'fg': '#d4d4d4',
+            'button_bg': '#404040', 'field_bg': '#3c3c3c',
+            'text_bg': '#1e1e1e', 'text_fg': '#d4d4d4',
+            'select_bg': '#264f78', 'select_fg': '#ffffff',
+            'heading_bg': '#404040', 'trough': '#1e1e1e',
+            'flag_bg': '#3d3000', 'link': '#6bbfff', 'insert': '#d4d4d4',
+        },
+        'Blue': {
+            'ttk': 'clam',
+            'bg': '#d4e4f5', 'fg': '#0a2040',
+            'button_bg': '#b8d0e8', 'field_bg': '#eaf2fb',
+            'text_bg': '#eaf2fb', 'text_fg': '#0a2040',
+            'select_bg': '#1a5c9a', 'select_fg': '#ffffff',
+            'heading_bg': '#b0c8e0', 'trough': '#a8c0d8',
+            'flag_bg': '#fffacc', 'link': '#004499', 'insert': '#0a2040',
+        },
+        'Green': {
+            'ttk': 'clam',
+            'bg': '#d0ebd0', 'fg': '#0a2a0a',
+            'button_bg': '#b8d8b8', 'field_bg': '#e8f5e8',
+            'text_bg': '#e8f5e8', 'text_fg': '#0a2a0a',
+            'select_bg': '#2a6a2a', 'select_fg': '#ffffff',
+            'heading_bg': '#a8c8a8', 'trough': '#a0c0a0',
+            'flag_bg': '#fffacc', 'link': '#005500', 'insert': '#0a2a0a',
+        },
+    }
 
     def __init__(self, root):
         self.root = root
@@ -752,10 +791,14 @@ class DNAMatchFinderApp:
         self._recent_files = self._load_history()
         self._show_person_geometry = self._load_show_person_geometry()
 
+        self._default_ttk_theme = ttk.Style().theme_use()
         self._mono_font = tkfont.Font(family='Courier', size=10)
         self._mono_font_bold = tkfont.Font(family='Courier', size=10, weight='bold')
+        self._link_color = '#0066cc'
         self._font_size_pref = self._load_font_preference()
+        self._theme_pref = self._load_theme_preference()
         self._apply_font_size(self._font_size_pref)
+        self._apply_theme(self._theme_pref)
 
         self._build_ui()
 
@@ -1242,7 +1285,7 @@ class DNAMatchFinderApp:
                 tag = f'pers_{pid.strip("@")}'
                 text.insert('end', describe(self.individuals[pid]),
                             ('person_link', tag))
-                text.tag_configure(tag, foreground='#0066cc', underline=True)
+                text.tag_configure(tag, foreground=self._link_color, underline=True)
                 text.tag_bind(tag, '<Button-1>',
                               lambda _, p=pid: populate(p))
                 text.insert('end', '\n')
@@ -1335,7 +1378,7 @@ class DNAMatchFinderApp:
             tag = f'pers_{indi_id.strip("@")}'
             w.insert('end', describe(self.individuals[indi_id]),
                      base + ('person_link', tag))
-            w.tag_configure(tag, foreground='#0066cc', underline=True)
+            w.tag_configure(tag, foreground=self._link_color, underline=True)
             w.tag_bind(tag, '<Button-1>',
                        lambda _, iid=indi_id: self._navigate_to(iid))
             if suffix:
@@ -1831,10 +1874,7 @@ class DNAMatchFinderApp:
             except tk.TclError:
                 pass
 
-        row_h = tkfont.nametofont('TkDefaultFont').metrics('linespace') + 6
-        style = ttk.Style()
-        style.configure('Treeview', font='TkDefaultFont', rowheight=row_h)
-        style.configure('Treeview.Heading', font='TkDefaultFont')
+        self._apply_styles()
 
         if hasattr(self, 'results'):
             self.root.after(0, self._refit_windows)
@@ -1862,8 +1902,139 @@ class DNAMatchFinderApp:
             except tk.TclError:
                 pass
 
+    def _apply_styles(self):
+        """Apply the current theme colours + font metrics to the ttk Style engine."""
+        style = ttk.Style()
+        t = self._THEMES.get(getattr(self, '_theme_pref', 'Default'))
+
+        if t is None:
+            try:
+                style.theme_use(self._default_ttk_theme)
+            except tk.TclError:
+                pass
+        else:
+            try:
+                style.theme_use(t['ttk'])
+            except tk.TclError:
+                pass
+            bg, fg = t['bg'], t['fg']
+            bbg, fbg = t['button_bg'], t['field_bg']
+            sel_bg, sel_fg = t['select_bg'], t['select_fg']
+            hbg, tr = t['heading_bg'], t['trough']
+
+            style.configure('.', background=bg, foreground=fg)
+            style.configure('TFrame', background=bg)
+            style.configure('TLabelframe', background=bg, foreground=fg)
+            style.configure('TLabelframe.Label', background=bg, foreground=fg)
+            style.configure('TLabel', background=bg, foreground=fg)
+            style.configure('TButton', background=bbg, foreground=fg)
+            style.map('TButton',
+                      background=[('active', sel_bg), ('pressed', sel_bg)],
+                      foreground=[('active', sel_fg), ('pressed', sel_fg)])
+            style.configure('TEntry', fieldbackground=fbg, foreground=fg,
+                            selectbackground=sel_bg, selectforeground=sel_fg)
+            style.configure('TCombobox', fieldbackground=fbg, foreground=fg,
+                            selectbackground=sel_bg, selectforeground=sel_fg,
+                            background=bbg, arrowcolor=fg)
+            style.map('TCombobox',
+                      fieldbackground=[('readonly', fbg)],
+                      selectbackground=[('readonly', sel_bg)],
+                      foreground=[('readonly', fg)])
+            style.configure('TSpinbox', fieldbackground=fbg, foreground=fg,
+                            background=bbg, arrowcolor=fg)
+            style.configure('TCheckbutton', background=bg, foreground=fg)
+            style.map('TCheckbutton', background=[('active', bg)])
+            style.configure('TRadiobutton', background=bg, foreground=fg)
+            style.map('TRadiobutton', background=[('active', bg)])
+            style.configure('TScrollbar', background=bbg, troughcolor=tr,
+                            arrowcolor=fg, bordercolor=bg,
+                            darkcolor=bbg, lightcolor=bbg)
+            style.configure('TPanedwindow', background=bg)
+            style.configure('Treeview', background=fbg, foreground=fg,
+                            fieldbackground=fbg)
+            style.configure('Treeview.Heading', background=hbg, foreground=fg)
+            style.map('Treeview',
+                      background=[('selected', sel_bg)],
+                      foreground=[('selected', sel_fg)])
+
+        row_h = tkfont.nametofont('TkDefaultFont').metrics('linespace') + 6
+        style.configure('Treeview', font='TkDefaultFont', rowheight=row_h)
+        style.configure('Treeview.Heading', font='TkDefaultFont')
+
+    def _apply_theme(self, theme_name):
+        self._theme_pref = theme_name
+        t = self._THEMES.get(theme_name)
+        self._apply_styles()
+        self._recolor_all(t)
+        if hasattr(self, 'tree'):
+            self.tree.tag_configure(
+                'flagged_row',
+                background=t['flag_bg'] if t else '#fff4cc',
+            )
+        if hasattr(self, 'results'):
+            self.root.after(0, self._refit_windows)
+
+    def _recolor_all(self, theme):
+        """Recolour every tk.Text widget and window background to match theme."""
+        if theme is None:
+            text_bg, text_fg = 'white', 'black'
+            insert_col = 'black'
+            sel_bg, sel_fg = '#0078d4', 'white'
+            link_col = '#0066cc'
+            root_bg = None
+        else:
+            text_bg, text_fg = theme['text_bg'], theme['text_fg']
+            insert_col = theme['insert']
+            sel_bg, sel_fg = theme['select_bg'], theme['select_fg']
+            link_col = theme['link']
+            root_bg = theme['bg']
+
+        self._link_color = link_col
+
+        def recolor(widget):
+            try:
+                if isinstance(widget, tk.Text):
+                    widget.configure(
+                        bg=text_bg, fg=text_fg,
+                        insertbackground=insert_col,
+                        selectbackground=sel_bg,
+                        selectforeground=sel_fg,
+                    )
+                    if hasattr(widget, 'frame'):
+                        widget.frame.configure(bg=text_bg)
+                    for tag in widget.tag_names():
+                        if tag.startswith('pers_'):
+                            widget.tag_configure(tag, foreground=link_col)
+                elif isinstance(widget, (tk.Tk, tk.Toplevel)) and root_bg:
+                    widget.configure(bg=root_bg)
+            except tk.TclError:
+                pass
+            for child in widget.winfo_children():
+                recolor(child)
+
+        recolor(self.root)
+
+    def _load_theme_preference(self):
+        try:
+            data = json.loads(self._config_path().read_text(encoding='utf-8'))
+            pref = data.get('theme', 'Default')
+            return pref if pref in self._THEME_NAMES else 'Default'
+        except Exception:
+            return 'Default'
+
+    def _save_theme_preference(self, theme_name):
+        cfg = self._config_path()
+        try:
+            data = json.loads(cfg.read_text(encoding='utf-8'))
+        except Exception:
+            data = {}
+        data['theme'] = theme_name
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+
     def _show_preferences(self):
-        original_pref = self._font_size_pref
+        original_font = self._font_size_pref
+        original_theme = self._theme_pref
 
         win = tk.Toplevel(self.root)
         win.title("Preferences")
@@ -1872,7 +2043,7 @@ class DNAMatchFinderApp:
         win.grab_set()
 
         self.root.update_idletasks()
-        dw, dh = 280, 140
+        dw, dh = 420, 210
         px = self.root.winfo_x() + (self.root.winfo_width() - dw) // 2
         py = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
         win.geometry(f"{dw}x{dh}+{px}+{py}")
@@ -1881,30 +2052,45 @@ class DNAMatchFinderApp:
         outer.pack(fill='both', expand=True)
 
         font_frame = ttk.LabelFrame(outer, text="Font size", padding=(12, 6))
-        font_frame.pack(fill='x')
+        font_frame.pack(fill='x', pady=(0, 8))
 
         size_var = tk.StringVar(value=self._font_size_pref)
 
-        def on_radio_change():
+        def on_font_change():
             self._apply_font_size(size_var.get())
 
         for label, key in (("Small", "small"), ("Medium", "medium"), ("Large", "large")):
             ttk.Radiobutton(
                 font_frame, text=label, variable=size_var, value=key,
-                command=on_radio_change,
+                command=on_font_change,
             ).pack(side='left', padx=8)
 
+        theme_frame = ttk.LabelFrame(outer, text="Theme", padding=(12, 6))
+        theme_frame.pack(fill='x', pady=(0, 8))
+
+        theme_var = tk.StringVar(value=self._theme_pref)
+
+        def on_theme_change():
+            self._apply_theme(theme_var.get())
+
+        for name in self._THEME_NAMES:
+            ttk.Radiobutton(
+                theme_frame, text=name, variable=theme_var, value=name,
+                command=on_theme_change,
+            ).pack(side='left', padx=6)
+
         btn_frame = ttk.Frame(outer)
-        btn_frame.pack(fill='x', pady=(16, 0))
+        btn_frame.pack(fill='x', pady=(8, 0))
 
         def on_ok():
-            chosen = size_var.get()
-            self._font_size_pref = chosen
-            self._save_font_preference(chosen)
+            self._font_size_pref = size_var.get()
+            self._save_font_preference(self._font_size_pref)
+            self._save_theme_preference(theme_var.get())
             win.destroy()
 
         def on_cancel():
-            self._apply_font_size(original_pref)
+            self._apply_font_size(original_font)
+            self._apply_theme(original_theme)
             win.destroy()
 
         ttk.Button(btn_frame, text="OK", command=on_ok).pack(side='right', padx=(4, 0))
@@ -2098,7 +2284,7 @@ class DNAMatchFinderApp:
             'Courier', size - 1), background='#f0f0f0')
         widget.tag_configure('code_block', font=('Courier', size - 1), background='#f0f0f0',
                              lmargin1=16, lmargin2=16, spacing1=1, spacing3=1)
-        widget.tag_configure('link', foreground='#0066cc')
+        widget.tag_configure('link', foreground=self._link_color)
         widget.tag_configure('bullet', lmargin1=16, lmargin2=32)
         widget.tag_configure('normal', font=(family, size))
 
