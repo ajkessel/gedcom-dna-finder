@@ -1,4 +1,5 @@
 #!/bin/bash
+out="gedcom-dna-finder-mac.zip"
 echo 'Building for macOS...'
 if [[ "$OSTYPE" != "darwin"* ]]; then
 	echo 'This script is intended to be run on macOS.'
@@ -28,7 +29,6 @@ export PYENV_ROOT="$HOME/.pyenv"
 	pyenv global 3.14.4
 }
 eval "$(pyenv init -)"
-out="gedcom-dna-finder-mac.zip"
 ./dev/generate_icns.sh ./icons/family_tree.png || {
 	echo 'Failed to generate ICNS file.'
 	exit 1

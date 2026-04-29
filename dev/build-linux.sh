@@ -1,4 +1,5 @@
 #!/bin/bash
+out="gedcom-dna-finder-linux.zip"
 if [[ "$OSTYPE" != "linux-gnu"* ]]; then
 	echo 'This script is intended to be run on Linux.'
 	exit 1
