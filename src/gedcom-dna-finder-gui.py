@@ -745,6 +745,7 @@ class DNAMatchFinderApp:
         self._sort_rev = False
 
         self._recent_files = self._load_history()
+        self._show_person_geometry = self._load_show_person_geometry()
 
         self._build_ui()
 
@@ -1192,8 +1193,20 @@ class DNAMatchFinderApp:
 
     def _show_person_for(self, indi_id):
         win = tk.Toplevel(self.root)
-        win.geometry("700x520")
+        win.geometry(self._show_person_geometry or "700x520")
         win.minsize(400, 300)
+
+        _geo_after = [None]
+
+        def _on_win_configure(event):
+            if event.widget is not win:
+                return
+            if _geo_after[0]:
+                win.after_cancel(_geo_after[0])
+            _geo_after[0] = win.after(
+                400, lambda: self._persist_show_person_geometry(win))
+
+        win.bind('<Configure>', _on_win_configure)
 
         text = scrolledtext.ScrolledText(win, font=(
             'Courier', 10), wrap='none', padx=8, pady=8)
@@ -1775,6 +1788,28 @@ class DNAMatchFinderApp:
         data.setdefault('home_persons', {})[gedcom_path] = indi_id
         cfg.parent.mkdir(parents=True, exist_ok=True)
         cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+
+    def _load_show_person_geometry(self):
+        try:
+            data = json.loads(self._config_path().read_text(encoding='utf-8'))
+            return data.get('show_person_geometry')
+        except Exception:
+            return None
+
+    def _persist_show_person_geometry(self, win):
+        try:
+            geo = win.geometry()
+            self._show_person_geometry = geo
+            cfg = self._config_path()
+            try:
+                data = json.loads(cfg.read_text(encoding='utf-8'))
+            except Exception:
+                data = {}
+            data['show_person_geometry'] = geo
+            cfg.parent.mkdir(parents=True, exist_ok=True)
+            cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        except Exception:
+            pass
 
     def _set_home_person(self):
         if not self.individuals:

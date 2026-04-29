@@ -10,7 +10,7 @@ Downloads:
 * [Mac](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-mac.zip) (see [security note](#macos-security))
 * [Linux](https://github.com/ajkessel/gedcom-dna-finder/releases/latest/download/gedcom-dna-finder-linux.zip)
 
-![Main window](screenshots/main-window.png)
+![Main window](screenshots/screen_recording.gif)
 
 This is an alpha release. Only one person has tested it so far--me.
 
@@ -39,6 +39,8 @@ in addition to the closest people with DNA match markers.
 Finally, if you have a large tree, you may find it difficult to search for specific individuals in tools like Ancestry or Family Tree Maker. Ancestry only searches on the person's "main name" and not any of the alternate names, and neither service allows fuzzy matching searches. Ancestry also does not allow you to easily search on multiple fields, like name and location. With this tool, you can search for a name with fuzzy matching (e.g. "John Smith" in the "Find:" box) and then further limit the results by a term that appears anywhere in the person's record (e.g. "Chicago" in the "Filter" box).
 
 ## What it does
+
+![Main window](screenshots/main-window.png)
 
 Given a GEDCOM file and a target individual, the tool performs a
 breadth-first search through the tree's relationship graph (parents,
