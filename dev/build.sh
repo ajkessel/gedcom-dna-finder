@@ -6,10 +6,6 @@ cd "${SCRIPT_DIR}/.."
 	echo 'Build files not found.'
 	exit 1
 }
-python3 ./dev/generate_icon.py ./icons/family_tree.png || {
-	echo 'Failed to generate ICO file.'
-	exit 1
-}
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
 	out="gedcom-dna-finder-linux.zip"
@@ -51,6 +47,10 @@ source .venv/bin/activate || {
 }
 pip install -r ./dev/requirements.txt || {
 	echo 'Failed to install dependencies.'
+	exit 1
+}
+python3 ./dev/generate_icon.py ./icons/family_tree.png || {
+	echo 'Failed to generate ICO file.'
 	exit 1
 }
 pyinstaller --noconfirm ./dev/gedcom-dna-finder-cli.spec || {

@@ -15,11 +15,11 @@ source .venv/bin/activate
 echo 'Building for Linux platform...'
 ./dev/build.sh
 echo 'Building for Mac platform...'
-ssh vmac 'cd gedcom-dna-finder/ ; git pull ; ./dev/build.sh'
+ssh mac 'cd src/gedcom-dna-finder/ ; git pull ; ./dev/build.sh'
 echo 'Building for Windows platform...'
 pwsh -command 'set-location c:/apps/src/gedcom-dna-finder ; git pull ; venv ; ./dev/build.ps1'
 echo 'Copying built ZIP files locally...'
-scp vmac:gedcom-dna-finder/dist/*zip ./dist
+scp mac:src/gedcom-dna-finder/dist/*zip ./dist
 cp /mnt/c/apps/src/gedcom-dna-finder/dist/*zip ./dist
 echo 'Uploading new release to GitHub...'
 gh release upload "${current}" ./dist/*zip --clobber
