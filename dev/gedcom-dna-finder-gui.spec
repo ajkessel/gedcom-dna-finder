@@ -103,3 +103,21 @@ if sys.platform == 'darwin':
                  name='gedcom-dna-finder.app',
                  icon='../icons/family_tree.icns',
                  bundle_identifier='com.ajkessel.gedcom-dna-finder')
+
+    # Re-sign the fully-assembled bundle so the CodeResources seal matches the
+    # final layout.  PyInstaller signs the inner EXE before COLLECT/BUNDLE run,
+    # which leaves the bundle-level signature out of sync and causes
+    # "codesign -v" to report "code has no resources but signature indicates
+    # they must be present".  A --force --deep pass after assembly fixes this.
+    _identity = check_codesigning_key()
+    if _identity:
+        subprocess.run(
+            [
+                'codesign', '--force', '--deep', '--timestamp',
+                '--sign', _identity,
+                '--options=runtime',
+                '--entitlements', os.path.join(SPECPATH, 'entitlements.plist'),
+                os.path.join(DISTPATH, 'gedcom-dna-finder.app'),
+            ],
+            check=True,
+        )
