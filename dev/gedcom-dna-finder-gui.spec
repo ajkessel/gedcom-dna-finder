@@ -88,7 +88,7 @@ if sys.platform == 'darwin':
               exclude_binaries=True,
               name='gedcom-dna-finder',
               codesign_identity=check_codesigning_key(),
-              entitlements_file='entitlements.plist',
+              entitlements_file=os.path.join(SPECPATH, 'entitlements.plist'),
               console=False)
 
     coll = COLLECT(exe,
