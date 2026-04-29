@@ -1,9 +1,12 @@
 # GEDCOM DNA Finder
 
-Find the closest DNA-flagged relative to any person in a GEDCOM family
-tree. Provided as both a GUI and a command-line tool.
+This tool provides useful ways to explore a GEDCOM file exported from services like Ancestry, MyHeritage, Geni, and Family Tree Maker:
 
-This is an alpha release. Only one person has tested it so far--me.
+* Find the closest DNA-flagged person to any other person in a family
+tree
+* Show multiple paths between any two people in your tree
+* Search your tree for variations on names and filter on other information like geographical locations
+* Rapidly explore names and connections in your tree
 
 ## The problem this solves
 
