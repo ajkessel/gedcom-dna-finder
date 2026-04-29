@@ -7,3 +7,4 @@ dist/
 *.zip
 build_and_release.log
 .DS_Store
+icons/family_tree.ico
