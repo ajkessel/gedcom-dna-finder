@@ -6,17 +6,19 @@ cd "${SCRIPT_DIR}/.."
 	echo 'Build files not found.'
 	exit 1
 }
+python3 ./dev/generate_icon.py ./icons/family_tree.png || {
+	echo 'Failed to generate ICO file.'
+	exit 1
+}
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
 	out="gedcom-dna-finder-linux.zip"
-	python3 ./dev/generate_icon.py ./icons/family_tree.png || {
-		echo 'Failed to generate ICO file.'
-		exit 1
-	}
 else
 	echo 'Building for macOS...'
   export PATH="/usr/local/bin:$PATH"
-  command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
+  command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH" || {
+    echo 'homebrew not found, we will still try to build but this script has not been tested on MacOS without brew.'
+  }
   command -v pyenv || {
     echo 'pyenv missing, attempting to install from homebrew...'
     brew install pyenv
