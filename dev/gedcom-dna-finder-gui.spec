@@ -106,18 +106,26 @@ if sys.platform == 'darwin':
 
     # Re-sign the fully-assembled bundle so the CodeResources seal matches the
     # final layout.  PyInstaller signs the inner EXE before COLLECT/BUNDLE run,
-    # which leaves the bundle-level signature out of sync and causes
-    # "codesign -v" to report "code has no resources but signature indicates
-    # they must be present".  A --force --deep pass after assembly fixes this.
+    # leaving the bundle-level signature out of sync.
+    #
+    # --deep is intentionally avoided: it does not descend into loose .dylib /
+    # .so files in Contents/MacOS, so those end up included in the outer seal
+    # while unsigned, causing "a sealed resource is missing or invalid".
+    # Instead, sign every shared library explicitly first (inside-out), then
+    # seal the outer bundle in a single final pass.
     _identity = check_codesigning_key()
     if _identity:
+        _app_path = os.path.join(DISTPATH, 'gedcom-dna-finder.app')
+        _entitlements = os.path.join(SPECPATH, 'entitlements.plist')
+        _sign_base = ['codesign', '--force', '--timestamp',
+                      '--sign', _identity, '--options=runtime']
+
+        for _pattern in ('**/*.dylib', '**/*.so'):
+            for _lib in glob.glob(
+                    os.path.join(_app_path, _pattern), recursive=True):
+                subprocess.run(_sign_base + [_lib], check=True)
+
         subprocess.run(
-            [
-                'codesign', '--force', '--deep', '--timestamp',
-                '--sign', _identity,
-                '--options=runtime',
-                '--entitlements', os.path.join(SPECPATH, 'entitlements.plist'),
-                os.path.join(DISTPATH, 'gedcom-dna-finder.app'),
-            ],
+            _sign_base + ['--entitlements', _entitlements, _app_path],
             check=True,
         )
