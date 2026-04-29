@@ -1,4 +1,8 @@
 #!/bin/bash
+if [[ "$OSTYPE" != "linux-gnu"* ]]; then
+	echo 'This script is intended to be run on Linux.'
+	exit 1
+fi
 [[ -e .venv/bin/activate ]] || {
 	echo 'Creating virtual environment...'
 	python3 -m venv .venv --prompt "gedcom-dna-finder" || {

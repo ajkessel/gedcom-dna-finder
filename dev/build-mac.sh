@@ -1,27 +1,37 @@
 #!/bin/bash
 echo 'Building for macOS...'
-security unlock-keychain ~/Library/Keychains/login.keychain-db
+if [[ "$OSTYPE" != "darwin"* ]]; then
+	echo 'This script is intended to be run on macOS.'
+	exit 1
+fi
+if [[ -e ${HOME}/.config/p ]]; then
+	echo 'Unlocking keychain...'
+	security unlock-keychain -p "$(cat ${HOME}/.config/p)" "${HOME}/Library/Keychains/login.keychain-db"
+else
+	echo 'Password file not found at ~/.config/p, skipping automatic keychain unlock.'
+	security unlock-keychain "${HOME}/Library/Keychains/login.keychain-db"
+fi
 export PATH="/usr/local/bin:$PATH"
 command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH" || {
-  echo 'homebrew not found, we will still try to build but this script has not been tested on MacOS without brew.'
+	echo 'homebrew not found, we will still try to build but this script has not been tested on MacOS without brew.'
 }
 command -v pyenv || {
-  echo 'pyenv missing, attempting to install from homebrew...'
-  brew install pyenv
+	echo 'pyenv missing, attempting to install from homebrew...'
+	brew install pyenv
 }
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -e "${PYENV_ROOT}/shims/python3.14" ]] || {
-  echo 'Installing pyenv for python 3.14.4'
-  mkdir -p "${PYENV_ROOT}"
-  eval "$(pyenv init -)"
-  pyenv install 3.14.4
-  pyenv global 3.14.4
+	echo 'Installing pyenv for python 3.14.4'
+	mkdir -p "${PYENV_ROOT}"
+	eval "$(pyenv init -)"
+	pyenv install 3.14.4
+	pyenv global 3.14.4
 }
 eval "$(pyenv init -)"
 out="gedcom-dna-finder-mac.zip"
 ./dev/generate_icns.sh ./icons/family_tree.png || {
-  echo 'Failed to generate ICNS file.'
-  exit 1
+	echo 'Failed to generate ICNS file.'
+	exit 1
 }
 [[ -e .venv/bin/activate ]] || {
 	echo 'Creating virtual environment...'
