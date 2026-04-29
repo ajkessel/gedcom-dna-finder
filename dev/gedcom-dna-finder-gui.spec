@@ -85,9 +85,10 @@ exe = EXE(
 if sys.platform == 'darwin':
     exe = EXE(pyz,
               a.scripts,
-              exclude_binaries=True, 
+              exclude_binaries=True,
               name='gedcom-dna-finder',
               codesign_identity=check_codesigning_key(),
+              entitlements_file='entitlements.plist',
               console=False)
 
     coll = COLLECT(exe,
