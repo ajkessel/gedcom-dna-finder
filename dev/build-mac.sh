@@ -60,3 +60,4 @@ xcrun notarytool submit "${out}" --keychain-profile "notarytool-profile" --wait
 xcrun stapler staple ./dist/gedcom-dna-finder.app
 rm "${out}"
 ditto -c -k --sequesterRsrc "dist/" "${out}"
+mv "${out}" dist/

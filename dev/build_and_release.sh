@@ -13,11 +13,11 @@ current=$(gh release list --json tagName,isLatest --jq '.[] | select(.isLatest) 
 git pull
 source .venv/bin/activate
 echo 'Building for Linux platform...'
-./dev/build.sh
+stdbuf -o0 ./dev/build.sh
 echo 'Building for Mac platform...'
-ssh mac 'cd src/gedcom-dna-finder/ ; git pull ; ./dev/build.sh'
+stdbuf -o0 ssh mac 'cd src/gedcom-dna-finder/ ; git pull ; ./dev/build.sh'
 echo 'Building for Windows platform...'
-pwsh -command 'set-location c:/apps/src/gedcom-dna-finder ; git pull ; venv ; ./dev/build.ps1'
+stdbuf -o0 pwsh -command 'set-location c:/apps/src/gedcom-dna-finder ; git pull ; venv ; ./dev/build.ps1'
 echo 'Copying built ZIP files locally...'
 scp mac:src/gedcom-dna-finder/dist/*zip ./dist
 cp /mnt/c/apps/src/gedcom-dna-finder/dist/*zip ./dist
