@@ -22,8 +22,8 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.8"
-__release_date__ = "2026-04-28"
+__version__ = "0.0.9"
+__release_date__ = "2026-04-29"
 
 import argparse
 import hashlib
@@ -741,6 +741,8 @@ class DNAMatchFinderApp:
         self._settings_after_id = None
         # {'type': 'dna_matches'|'path', 'start_id': ..., 'end_id': ...}
         self._last_result = None
+        self._sort_col = 'name'
+        self._sort_rev = False
 
         self._recent_files = self._load_history()
 
@@ -834,10 +836,10 @@ class DNAMatchFinderApp:
             show='headings',
             selectmode='browse',
         )
-        self.tree.heading('name', text='Name')
-        self.tree.heading('years', text='Years')
-        self.tree.heading('flagged', text='DNA?')
-        self.tree.heading('id', text='ID')
+        self.tree.heading('name', text='Name', command=lambda: self._sort_by('name'))
+        self.tree.heading('years', text='Years', command=lambda: self._sort_by('years'))
+        self.tree.heading('flagged', text='DNA?', command=lambda: self._sort_by('flagged'))
+        self.tree.heading('id', text='ID', command=lambda: self._sort_by('id'))
         self.tree.column('name', width=260, anchor='w', stretch=True)
         self.tree.column('years', width=80, anchor='w', stretch=False)
         self.tree.column('flagged', width=50, anchor='center', stretch=False)
@@ -1046,9 +1048,29 @@ class DNAMatchFinderApp:
         flagged_count = sum(
             1 for i in self.individuals.values() if i['dna_markers'])
 
+        # Update column heading sort indicators
+        _col_labels = {'name': 'Name', 'years': 'Years', 'flagged': 'DNA?', 'id': 'ID'}
+        for _col, _label in _col_labels.items():
+            suffix = (' ▼' if self._sort_rev else ' ▲') if _col == self._sort_col else ''
+            self.tree.heading(_col, text=_label + suffix)
+
+        # Sort ids according to current sort column/direction
+        def _sort_key(indi_id):
+            indi = self.individuals[indi_id]
+            if self._sort_col == 'years':
+                by = indi['birth_year']
+                return (by is None, by or 0, indi['name'].lower())
+            if self._sort_col == 'flagged':
+                return (not bool(indi['dna_markers']), indi['name'].lower())
+            if self._sort_col == 'id':
+                return (indi_id,)
+            return (indi['name'].lower(), indi_id)
+
+        display_ids = sorted(self.sorted_ids, key=_sort_key, reverse=self._sort_rev)
+
         shown = 0
         truncated = False
-        for indi_id in self.sorted_ids:
+        for indi_id in display_ids:
             indi = self.individuals[indi_id]
             if flagged_only and not indi['dna_markers']:
                 continue
@@ -1125,6 +1147,14 @@ class DNAMatchFinderApp:
             for word in name_words
         )
 
+    def _sort_by(self, col):
+        if self._sort_col == col:
+            self._sort_rev = not self._sort_rev
+        else:
+            self._sort_col = col
+            self._sort_rev = False
+        self._populate_tree()
+
     def _find_matches(self):
         if not self.individuals:
             messagebox.showwarning("No data", "Load a GEDCOM file first.")
@@ -1158,30 +1188,104 @@ class DNAMatchFinderApp:
             messagebox.showwarning(
                 "No selection", "Select a person from the list first.")
             return
-        indi_id = sel[0]
-        indi = self.individuals[indi_id]
+        self._show_person_for(sel[0])
 
+    def _show_person_for(self, indi_id):
         win = tk.Toplevel(self.root)
-        win.title(f"GEDCOM Record: {indi['name'] or indi_id}")
         win.geometry("700x520")
         win.minsize(400, 300)
 
         text = scrolledtext.ScrolledText(win, font=(
             'Courier', 10), wrap='none', padx=8, pady=8)
         text.pack(fill='both', expand=True)
+        text.tag_configure('bold', font=('Courier', 10, 'bold'))
+        text.tag_configure('person_link')
+        text.tag_bind('person_link', '<Enter>', lambda _: text.config(cursor='hand2'))
+        text.tag_bind('person_link', '<Leave>', lambda _: text.config(cursor=''))
 
-        lines = []
-        for level, xref, tag, value in indi.get('_raw', []):
-            parts = [str(level)]
-            if xref:
-                parts.append(xref)
-            parts.append(tag)
-            if value:
-                parts.append(value)
-            lines.append(' '.join(parts))
+        def populate(iid):
+            indi = self.individuals[iid]
+            win.title(f"GEDCOM Record: {indi['name'] or iid}")
+            text.configure(state='normal')
+            text.delete('1.0', 'end')
+            self._clear_person_tags(text)
 
-        text.insert('1.0', '\n'.join(lines))
-        text.configure(state='disabled')
+            def add(line, bold=False):
+                text.insert('end', line + '\n', ('bold',) if bold else ())
+
+            def person(pid, prefix=''):
+                if prefix:
+                    text.insert('end', prefix)
+                tag = f'pers_{pid.strip("@")}'
+                text.insert('end', describe(self.individuals[pid]),
+                            ('person_link', tag))
+                text.tag_configure(tag, foreground='#0066cc', underline=True)
+                text.tag_bind(tag, '<Button-1>',
+                              lambda _, p=pid: populate(p))
+                text.insert('end', '\n')
+
+            add("── Family ──", bold=True)
+            family_found = False
+
+            parents = []
+            for fam_id in indi['famc']:
+                fam = self.families.get(fam_id)
+                if not fam:
+                    continue
+                for pid in (fam['husb'], fam['wife']):
+                    if pid and pid in self.individuals:
+                        parents.append(pid)
+            if parents:
+                family_found = True
+                add("  Parents:")
+                for pid in parents:
+                    person(pid, prefix="    ")
+
+            siblings = []
+            for fam_id in indi['famc']:
+                fam = self.families.get(fam_id)
+                if not fam:
+                    continue
+                for sib_id in fam['chil']:
+                    if sib_id != iid and sib_id in self.individuals:
+                        siblings.append(sib_id)
+            if siblings:
+                family_found = True
+                add("  Siblings:")
+                for sib_id in siblings:
+                    person(sib_id, prefix="    ")
+
+            children = []
+            for fam_id in indi['fams']:
+                fam = self.families.get(fam_id)
+                if not fam:
+                    continue
+                for child_id in fam['chil']:
+                    if child_id in self.individuals:
+                        children.append(child_id)
+            if children:
+                family_found = True
+                add("  Children:")
+                for child_id in children:
+                    person(child_id, prefix="    ")
+
+            if not family_found:
+                add("  (no family information found)")
+            add("")
+            add("── GEDCOM Record ──", bold=True)
+
+            for level, xref, tag, value in indi.get('_raw', []):
+                parts = [str(level)]
+                if xref:
+                    parts.append(xref)
+                parts.append(tag)
+                if value:
+                    parts.append(value)
+                add(' '.join(parts))
+
+            text.configure(state='disabled')
+
+        populate(indi_id)
 
         btn_frame = ttk.Frame(win)
         btn_frame.pack(fill='x', pady=(4, 8))
@@ -1189,46 +1293,113 @@ class DNAMatchFinderApp:
             side='right', padx=8)
 
     def _render_results(self, start_id, results):
-        # Each entry is (text, bold).
-        lines = []
+        w = self.results
+        w.configure(state='normal')
+        w.delete('1.0', 'end')
+        self._clear_person_tags(w)
 
-        def add(text, bold=False):
-            lines.append((text, bold))
+        w.tag_configure('person_link')
+        w.tag_bind('person_link', '<Enter>', lambda _: w.config(cursor='hand2'))
+        w.tag_bind('person_link', '<Leave>', lambda _: w.config(cursor=''))
+
+        def nl(text='', bold=False):
+            w.insert('end', text + '\n', ('bold',) if bold else ())
+
+        def person(indi_id, prefix='', suffix='', bold=False):
+            base = ('bold',) if bold else ()
+            if prefix:
+                w.insert('end', prefix, base)
+            tag = f'pers_{indi_id.strip("@")}'
+            w.insert('end', describe(self.individuals[indi_id]),
+                     base + ('person_link', tag))
+            w.tag_configure(tag, foreground='#0066cc', underline=True)
+            w.tag_bind(tag, '<Button-1>',
+                       lambda _, iid=indi_id: self._navigate_to(iid))
+            if suffix:
+                w.insert('end', suffix, base)
+            w.insert('end', '\n')
 
         start = self.individuals[start_id]
-        add(f"Starting from: {describe(start)}")
+        person(start_id, prefix="Starting from: ")
         if start['dna_markers']:
-            add("  Note: this person is themselves DNA-flagged.")
+            nl("  Note: this person is themselves DNA-flagged.")
             for m in start['dna_markers']:
-                add(f"    - {m}")
-        add("")
+                nl(f"    - {m}")
+        nl()
 
         if not results:
-            add("No DNA-flagged relatives found within the search depth.")
+            nl("No DNA-flagged relatives found within the search depth.")
         else:
             for rank, (dist, path) in enumerate(results, 1):
                 end_id = path[-1][0]
-                end = self.individuals[end_id]
-                add(f"#{rank}: {describe(end)}    (distance: {dist} edges)",
-                    bold=True)
-                add("   DNA markers:")
-                for m in end['dna_markers']:
-                    add(f"     - {m}")
-                add("   Path:")
+                person(end_id, prefix=f"#{rank}: ",
+                       suffix=f"    (distance: {dist} edges)", bold=True)
+                nl("   DNA markers:")
+                for m in self.individuals[end_id]['dna_markers']:
+                    nl(f"     - {m}")
+                nl("   Path:")
                 for i, (node_id, edge) in enumerate(path):
-                    indi = self.individuals[node_id]
                     if i == 0:
-                        add(f"     {describe(indi)}")
+                        person(node_id, prefix="     ")
                     else:
-                        add(f"       --[{edge}]--> {describe(indi)}")
-                add("")
+                        person(node_id, prefix=f"       --[{edge}]--> ")
+                nl()
+
+        # Family section
+        nl("── Family ──", bold=True)
+        family_found = False
+
+        parents = []
+        for fam_id in start['famc']:
+            fam = self.families.get(fam_id)
+            if not fam:
+                continue
+            for pid in (fam['husb'], fam['wife']):
+                if pid and pid in self.individuals:
+                    parents.append(pid)
+        if parents:
+            family_found = True
+            nl("  Parents:")
+            for pid in parents:
+                person(pid, prefix="    ")
+
+        siblings = []
+        for fam_id in start['famc']:
+            fam = self.families.get(fam_id)
+            if not fam:
+                continue
+            for sib_id in fam['chil']:
+                if sib_id != start_id and sib_id in self.individuals:
+                    siblings.append(sib_id)
+        if siblings:
+            family_found = True
+            nl("  Siblings:")
+            for sib_id in siblings:
+                person(sib_id, prefix="    ")
+
+        children = []
+        for fam_id in start['fams']:
+            fam = self.families.get(fam_id)
+            if not fam:
+                continue
+            for child_id in fam['chil']:
+                if child_id in self.individuals:
+                    children.append(child_id)
+        if children:
+            family_found = True
+            nl("  Children:")
+            for child_id in children:
+                person(child_id, prefix="    ")
+
+        if not family_found:
+            nl("  (no family information found)")
+        nl()
 
         # Home person relationship
         home_id = self._home_person_id
         if home_id and home_id != start_id and home_id in self.individuals:
-            home = self.individuals[home_id]
-            add("── Path to Home Person ──", bold=True)
-            add(f"Home: {describe(home)}")
+            nl("── Path to Home Person ──", bold=True)
+            person(home_id, prefix="Home: ")
             try:
                 max_depth = int(self.max_depth.get())
             except (tk.TclError, ValueError):
@@ -1238,7 +1409,7 @@ class DNAMatchFinderApp:
                 top_n=1, max_depth=max_depth,
             )
             if not home_paths:
-                add("No path found to home person within the current max depth.")
+                nl("No path found to home person within the current max depth.")
             else:
                 path = home_paths[0]
                 ancestors = get_ancestor_depths(
@@ -1249,21 +1420,16 @@ class DNAMatchFinderApp:
                     path, self.individuals,
                     ancestors=ancestors, descendants=descendants)
                 dist = len(path) - 1
-                add(f"Relationship: {rel} ({dist} edge{'s' if dist != 1 else ''})")
-                add("Path:")
+                nl(f"Relationship: {rel} ({dist} edge{'s' if dist != 1 else ''})")
+                nl("Path:")
                 for i, (node_id, edge) in enumerate(path):
-                    indi = self.individuals[node_id]
                     if i == 0:
-                        add(f"  {describe(indi)}")
+                        person(node_id, prefix="  ")
                     else:
-                        add(f"    --[{edge}]--> {describe(indi)}")
-            add("")
+                        person(node_id, prefix=f"    --[{edge}]--> ")
+            nl()
 
-        self.results.configure(state='normal')
-        self.results.delete('1.0', 'end')
-        for text, bold in lines:
-            self.results.insert('end', text + '\n', 'bold' if bold else '')
-        self.results.configure(state='disabled')
+        w.configure(state='disabled')
 
     def _copy_results(self):
         text = self.results.get('1.0', 'end').rstrip()
@@ -1279,6 +1445,33 @@ class DNAMatchFinderApp:
         self.search_text.set('')
         self._last_result = None
         self._kb_focus_search()
+
+    def _clear_person_tags(self, widget):
+        for tag in widget.tag_names():
+            if tag.startswith('pers_'):
+                widget.tag_delete(tag)
+
+    def _navigate_to(self, indi_id):
+        if not self.tree.exists(indi_id):
+            self.search_text.set('')
+            self.filter_text.set('')
+            self.show_flagged_only.set(False)
+            self._populate_tree()
+        if self.tree.exists(indi_id):
+            self.tree.selection_set(indi_id)
+            self.tree.see(indi_id)
+            self.tree.focus(indi_id)
+        try:
+            top_n = int(self.top_n.get())
+            max_depth = int(self.max_depth.get())
+        except (tk.TclError, ValueError):
+            return
+        results = bfs_find_dna_matches(
+            indi_id, self.individuals, self.families,
+            top_n=top_n, max_depth=max_depth,
+        )
+        self._last_result = {'type': 'dna_matches', 'start_id': indi_id}
+        self._render_results(indi_id, results)
 
     def _view_tags(self):
         if not self.tag_records:
