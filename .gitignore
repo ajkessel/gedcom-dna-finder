@@ -6,3 +6,4 @@ build/
 dist/
 *.zip
 build_and_release.log
+.DS_Store

@@ -17,6 +17,10 @@ else
 	echo 'Building for macOS...'
   export PATH="/usr/local/bin:$PATH"
   command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH"
+  command -v pyenv || {
+    echo 'pyenv missing, attempting to install from homebrew...'
+    brew install pyenv
+  }
   export PYENV_ROOT="$HOME/.pyenv"
   [[ -e "${PYENV_ROOT}/shims/python3.14" ]] || {
     echo 'Installing pyenv for python 3.14.4'
