@@ -291,6 +291,10 @@ You may get a warning from Windows Defender that this is an unrecognized app fro
 
 If you are on Mac and not running from the source code, you will have to tell the operating system manually to trust the program. As of 29 April 2026, I am testing a new build process that should only require one "click" to approve after downloading.
 
+![Mac Screenshot](screenshots/downloaded-from-internet.png)
+
+### Old instructions
+
 The instructions below apply to older versions of this application and hopefully are no longer necessary.
 
 1. Attempt to open the app (it will fail).
