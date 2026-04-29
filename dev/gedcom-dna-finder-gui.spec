@@ -3,7 +3,30 @@
 import glob
 import os
 import sys
+import subprocess
+import re
 from PyInstaller.utils.hooks import collect_data_files
+
+def check_codesigning_key():
+    """
+    Checks if a codesigning key exists in the user keychain; if so, use to sign the package.
+    """
+    identity_name = "Developer ID Application"
+    try:
+        result = subprocess.run(
+            ['security', 'find-identity', '-v', '-p', 'codesigning'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        for line in result.stdout.splitlines():
+            if identity_name in line:
+                key = re.search(r'[0-9A-Z]{40}',line)
+                return(key[0])
+            
+    except subprocess.CalledProcessError as e:
+        print(f"Error checking keychain: {e}")
+        return False
 
 # ffi-8.dll / libffi-8.dll is required by _ctypes.pyd on Windows but is not
 # auto-detected by PyInstaller. Conda names it ffi-8.dll (no lib prefix) and
@@ -64,6 +87,7 @@ if sys.platform == 'darwin':
               a.scripts,
               exclude_binaries=True, 
               name='gedcom-dna-finder',
+              codesign_identity=check_codesigning_key(),
               console=False)
 
     coll = COLLECT(exe,
