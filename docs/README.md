@@ -100,7 +100,7 @@ That's the whole installation. The two scripts are independent and
 can be run from anywhere.
 
 If you want to compile executable versions of these scripts yourself, use
-[build.sh](dev/build.sh) to compile for Linux or Mac and [build.ps1](dev/build.ps1)
+[build.sh](../dev/build.sh) to compile for Linux or Mac and [build.ps1](../dev/build.ps1)
 to compile for Windows. The build script automatically creates a Python virtual environment and installs the required dependencies for the platform you are building on. These dependencies are only needed for building, not for running from source.
 
 I also have a custom [build_and_release.sh](dev/build_and_release.sh)
@@ -289,7 +289,7 @@ You may get a warning from Windows Defender that this is an unrecognized app fro
 
 ## MacOS security
 
-If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
+If you are on Mac and not running from the source code, you will have to tell the operating system manually to trust the program. If anyone with an Apple Developer account is interested in signing the package to make it easier to install, I would welcome the assistance, but for now, follow these steps:
 
 1. Attempt to open the app (it will fail).
 2. Open System Settings > Privacy & Security.
