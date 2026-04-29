@@ -289,7 +289,7 @@ You may get a warning from Windows Defender that this is an unrecognized app fro
 
 ## MacOS security
 
-If you are on Mac and not running from the source code, you will have to tell the operating system to trust the program. If anyone with an Apple Developer account is interested in signing the package, I would welcome the assistance, but for now, follow these steps:
+If you are on Mac and not running from the source code, you will have to tell the operating system manually to trust the program. If anyone with an Apple Developer account is interested in signing the package to make it easier to install, I would welcome the assistance, but for now, follow these steps:
 
 1. Attempt to open the app (it will fail).
 2. Open System Settings > Privacy & Security.
