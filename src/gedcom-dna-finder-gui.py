@@ -22,7 +22,7 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.0.9"
+__version__ = "0.1.0"
 __release_date__ = "2026-04-29"
 
 import argparse
@@ -695,6 +695,11 @@ class DNAMatchFinderApp:
     MAX_LIST_DISPLAY = 2000  # cap visible rows in the people list
     FUZZY_THRESHOLD = 0.72   # minimum SequenceMatcher ratio to count as a match
     MAX_RECENT = 10          # number of recent files to remember
+    _FONT_SIZES = {
+        'small':  {'ui': 9,  'mono': 9},
+        'medium': {'ui': 10, 'mono': 10},
+        'large':  {'ui': 13, 'mono': 12},
+    }
 
     def __init__(self, root):
         self.root = root
@@ -746,6 +751,11 @@ class DNAMatchFinderApp:
 
         self._recent_files = self._load_history()
         self._show_person_geometry = self._load_show_person_geometry()
+
+        self._mono_font = tkfont.Font(family='Courier', size=10)
+        self._mono_font_bold = tkfont.Font(family='Courier', size=10, weight='bold')
+        self._font_size_pref = self._load_font_preference()
+        self._apply_font_size(self._font_size_pref)
 
         self._build_ui()
 
@@ -897,10 +907,10 @@ class DNAMatchFinderApp:
                    command=self._clear_results).pack(side='right', padx=(0, 4))
 
         self.results = scrolledtext.ScrolledText(
-            right, font=('Courier', 10), wrap='word', height=10
+            right, font=self._mono_font, wrap='word', height=10
         )
         self.results.pack(fill='both', expand=True, pady=(4, 0))
-        self.results.tag_configure('bold', font=('Courier', 10, 'bold'))
+        self.results.tag_configure('bold', font=self._mono_font_bold)
         self.results.configure(state='disabled')
 
         # Status bar
@@ -1208,10 +1218,10 @@ class DNAMatchFinderApp:
 
         win.bind('<Configure>', _on_win_configure)
 
-        text = scrolledtext.ScrolledText(win, font=(
-            'Courier', 10), wrap='none', padx=8, pady=8)
+        text = scrolledtext.ScrolledText(
+            win, font=self._mono_font, wrap='none', padx=8, pady=8)
         text.pack(fill='both', expand=True)
-        text.tag_configure('bold', font=('Courier', 10, 'bold'))
+        text.tag_configure('bold', font=self._mono_font_bold)
         text.tag_configure('person_link')
         text.tag_bind('person_link', '<Enter>', lambda _: text.config(cursor='hand2'))
         text.tag_bind('person_link', '<Leave>', lambda _: text.config(cursor=''))
@@ -1496,7 +1506,7 @@ class DNAMatchFinderApp:
         win.title("_MTTAG definitions")
         win.geometry("450x400")
         text = scrolledtext.ScrolledText(
-            win, font=('Courier', 10), wrap='none')
+            win, font=self._mono_font, wrap='none')
         text.pack(fill='both', expand=True)
         lines = [f"{tid}\t{name}" for tid,
                  name in sorted(self.tag_records.items())]
@@ -1789,6 +1799,117 @@ class DNAMatchFinderApp:
         cfg.parent.mkdir(parents=True, exist_ok=True)
         cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
 
+    def _load_font_preference(self):
+        try:
+            data = json.loads(self._config_path().read_text(encoding='utf-8'))
+            pref = data.get('font_size', 'medium')
+            return pref if pref in self._FONT_SIZES else 'medium'
+        except Exception:
+            return 'medium'
+
+    def _save_font_preference(self, size_name):
+        cfg = self._config_path()
+        try:
+            data = json.loads(cfg.read_text(encoding='utf-8'))
+        except Exception:
+            data = {}
+        data['font_size'] = size_name
+        cfg.parent.mkdir(parents=True, exist_ok=True)
+        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+
+    def _apply_font_size(self, size_name):
+        sizes = self._FONT_SIZES[size_name]
+        mono_sz = sizes['mono']
+        ui_sz = sizes['ui']
+
+        self._mono_font.configure(size=mono_sz)
+        self._mono_font_bold.configure(size=mono_sz)
+
+        for fname in ('TkDefaultFont', 'TkTextFont', 'TkMenuFont', 'TkSmallCaptionFont'):
+            try:
+                tkfont.nametofont(fname).configure(size=ui_sz)
+            except tk.TclError:
+                pass
+
+        row_h = tkfont.nametofont('TkDefaultFont').metrics('linespace') + 6
+        style = ttk.Style()
+        style.configure('Treeview', font='TkDefaultFont', rowheight=row_h)
+        style.configure('Treeview.Heading', font='TkDefaultFont')
+
+        if hasattr(self, 'results'):
+            self.root.after(0, self._refit_windows)
+
+    def _refit_windows(self):
+        self.root.update_idletasks()
+        req_w = self.root.winfo_reqwidth()
+        cur_w = self.root.winfo_width()
+        cur_h = self.root.winfo_height()
+        self.root.minsize(max(req_w, 800), 500)
+        if cur_w < req_w:
+            self.root.geometry(f"{req_w}x{cur_h}")
+        for win in self.root.winfo_children():
+            if not isinstance(win, tk.Toplevel):
+                continue
+            try:
+                rw = win.winfo_reqwidth()
+                rh = win.winfo_reqheight()
+                cw = win.winfo_width()
+                ch = win.winfo_height()
+                new_w = max(cw, rw)
+                new_h = max(ch, rh)
+                if new_w != cw or new_h != ch:
+                    win.geometry(f"{new_w}x{new_h}")
+            except tk.TclError:
+                pass
+
+    def _show_preferences(self):
+        original_pref = self._font_size_pref
+
+        win = tk.Toplevel(self.root)
+        win.title("Preferences")
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.grab_set()
+
+        self.root.update_idletasks()
+        dw, dh = 280, 140
+        px = self.root.winfo_x() + (self.root.winfo_width() - dw) // 2
+        py = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
+        win.geometry(f"{dw}x{dh}+{px}+{py}")
+
+        outer = ttk.Frame(win, padding=16)
+        outer.pack(fill='both', expand=True)
+
+        font_frame = ttk.LabelFrame(outer, text="Font size", padding=(12, 6))
+        font_frame.pack(fill='x')
+
+        size_var = tk.StringVar(value=self._font_size_pref)
+
+        def on_radio_change():
+            self._apply_font_size(size_var.get())
+
+        for label, key in (("Small", "small"), ("Medium", "medium"), ("Large", "large")):
+            ttk.Radiobutton(
+                font_frame, text=label, variable=size_var, value=key,
+                command=on_radio_change,
+            ).pack(side='left', padx=8)
+
+        btn_frame = ttk.Frame(outer)
+        btn_frame.pack(fill='x', pady=(16, 0))
+
+        def on_ok():
+            chosen = size_var.get()
+            self._font_size_pref = chosen
+            self._save_font_preference(chosen)
+            win.destroy()
+
+        def on_cancel():
+            self._apply_font_size(original_pref)
+            win.destroy()
+
+        ttk.Button(btn_frame, text="OK", command=on_ok).pack(side='right', padx=(4, 0))
+        ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side='right')
+
     def _load_show_person_geometry(self):
         try:
             data = json.loads(self._config_path().read_text(encoding='utf-8'))
@@ -1894,6 +2015,8 @@ class DNAMatchFinderApp:
 
         app_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label='Menu', menu=app_menu)
+        app_menu.add_command(label='Preferences…', command=self._show_preferences)
+        app_menu.add_separator()
         app_menu.add_command(label='How to use', command=self._show_how_to_use)
         app_menu.add_command(label='Keyboard shortcuts',
                              command=self._show_keyboard_shortcuts)
