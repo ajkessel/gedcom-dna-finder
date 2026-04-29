@@ -129,3 +129,18 @@ if sys.platform == 'darwin':
             _sign_base + ['--entitlements', _entitlements, _app_path],
             check=True,
         )
+
+        # Package for distribution using ditto, which preserves the symlinks
+        # that PyInstaller places inside the bundle.  Regular zip (Finder,
+        # command-line zip, GitHub upload-artifact) resolves symlinks into real
+        # files/directories, which invalidates the CodeResources seal and causes
+        # "a sealed resource is missing or invalid" on the recipient's machine.
+        _zip_path = os.path.join(DISTPATH, 'gedcom-dna-finder-mac.zip')
+        subprocess.run(
+            [
+                'ditto', '-c', '-k', '--sequesterRsrc', '--keepParent',
+                _app_path, _zip_path,
+            ],
+            check=True,
+        )
+        print(f'Distribution archive: {_zip_path}')
