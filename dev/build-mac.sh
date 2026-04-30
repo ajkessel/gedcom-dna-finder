@@ -71,3 +71,53 @@ xcrun stapler staple ./dist/gedcom-dna-finder.app
 rm "${out}"
 ditto -c -k --sequesterRsrc "dist/" "${out}"
 mv "${out}" dist/
+
+# ── App Store package (.pkg) ────────────────────────────────────────────────
+# Requires two certificates in the keychain:
+#   "3rd Party Mac Developer Application: ..." (signs the .app)
+#   "3rd Party Mac Developer Installer: ..."   (signs the .pkg)
+# Both are downloaded from the Apple Developer portal.
+AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null \
+	| grep "3rd Party Mac Developer Application" \
+	| grep -Eo '[0-9A-Z]{40}' | head -1)
+AS_INST_CERT=$(security find-identity -v 2>/dev/null \
+	| grep "3rd Party Mac Developer Installer" \
+	| grep -Eo '[0-9A-Z]{40}' | head -1)
+
+if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
+	echo "Building App Store package..."
+	APP_SRC="dist/gedcom-dna-finder.app"
+	APP_AS="dist/gedcom-dna-finder-appstore.app"
+	PKG="dist/gedcom-dna-finder.pkg"
+
+	# Work from a clean copy so the notarised Developer-ID build is untouched
+	rm -rf "${APP_AS}"
+	cp -R "${APP_SRC}" "${APP_AS}"
+
+	# Deep-sign every binary inside the bundle with the App Store identity.
+	# --deep ensures nested frameworks/.dylibs are signed before the outer
+	# bundle, satisfying library-validation without the disable-library-
+	# validation entitlement that App Store review rejects.
+	codesign --deep --force --verify --verbose \
+		--sign "${AS_APP_CERT}" \
+		--entitlements "./dev/entitlements-appstore.plist" \
+		"${APP_AS}" || {
+		echo "App Store code-signing failed."
+		exit 1
+	}
+
+	productbuild \
+		--component "${APP_AS}" /Applications \
+		--sign "${AS_INST_CERT}" \
+		"${PKG}" || {
+		echo "productbuild failed."
+		exit 1
+	}
+
+	rm -rf "${APP_AS}"
+	echo "App Store package created: ${PKG}"
+else
+	echo "No App Store signing certificates found; skipping pkg creation."
+	[[ -z "${AS_APP_CERT}" ]] && echo "  Missing: 3rd Party Mac Developer Application"
+	[[ -z "${AS_INST_CERT}" ]] && echo "  Missing: 3rd Party Mac Developer Installer"
+fi

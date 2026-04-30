@@ -1659,6 +1659,8 @@ class DNAMatchFinderApp:
             self.max_depth.set(original_max_depth)
             win.destroy()
 
+        win.bind('<Escape>', lambda _: on_cancel())
+
         ttk.Button(btn_frame, text="OK", command=on_ok).pack(side='right', padx=(4, 0))
         ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side='right')
 
@@ -1828,6 +1830,9 @@ class DNAMatchFinderApp:
         win.title(title)
         win.geometry("820x640")
         win.minsize(500, 300)
+        win.transient(self.root)
+        win.grab_set()
+        win.bind('<Escape>', lambda _: win.destroy())
 
         text = scrolledtext.ScrolledText(win, wrap='word', padx=12, pady=8)
         text.pack(fill='both', expand=True)
@@ -1839,6 +1844,8 @@ class DNAMatchFinderApp:
 
         text.configure(state='disabled')
         ttk.Button(win, text="Close", command=win.destroy).pack(pady=(4, 8))
+        win.lift()
+        win.focus_set()
 
     def _render_markdown(self, widget, content):
         """Render basic markdown into a tkinter Text widget using tag formatting."""

@@ -17,7 +17,7 @@ Downloads:
 
 ![Main window](screenshots/screen_recording.gif)
 
-This is an alpha release. Only one person has tested it so far--me.
+This is an alpha release. Only one person has tested it so far--me. If you are interested in experimenting with a "dummy" GEDCOM file rather than your own, several are available at https://github.com/findmypast/gedcom-samples
 
 ## The problem this solves
 
