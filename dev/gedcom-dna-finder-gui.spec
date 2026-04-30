@@ -7,6 +7,7 @@ import subprocess
 import re
 from PyInstaller.utils.hooks import collect_data_files
 
+
 def check_codesigning_key():
     """
     Checks if a codesigning key exists in the user keychain; if so, use to sign the package.
@@ -21,12 +22,13 @@ def check_codesigning_key():
         )
         for line in result.stdout.splitlines():
             if identity_name in line:
-                key = re.search(r'[0-9A-Z]{40}',line)
-                return(key[0])
-            
+                key = re.search(r'[0-9A-Z]{40}', line)
+                return (key[0])
+
     except subprocess.CalledProcessError as e:
         print(f"Error checking keychain: {e}")
         return False
+
 
 # ffi-8.dll / libffi-8.dll is required by _ctypes.pyd on Windows but is not
 # auto-detected by PyInstaller. Conda names it ffi-8.dll (no lib prefix) and
@@ -59,7 +61,9 @@ a = Analysis(
     ['../src/gedcom-dna-finder-gui.py'],
     pathex=[],
     binaries=_extra_binaries,
-    datas=[('../docs/HELP.md', './docs'), ('../docs/LICENSE.md', '.'), ('../icons/family_tree.ico','./icons'), ('../icons/family_tree.png','./icons')],
+    datas=[('../docs/HELP.md', './docs'), ('../docs/LICENSE.md', './docs'),
+           ('../docs/KEYBOARD_SHORTCUTS.md', './docs'), ('../docs/PRIVACY_POLICY.md', '.'),
+           ('../icons/family_tree.ico', './icons'), ('../icons/family_tree.png', './icons')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

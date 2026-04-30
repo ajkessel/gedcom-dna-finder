@@ -21,11 +21,11 @@ $ErrorActionPreference = "Stop"
 
 Set-Location -Path "$PSScriptRoot\.."
 
-if ( test-path ( .\venv\Scripts\Activate.ps1 ) ) {
+if ( Test-Path .\Venv\Scripts\Activate.ps1 ) {
   & ".\venv\Scripts\Activate.ps1"
 }
 
-if ( -not ( test-path ( .\dist\pypi ) ) ) {
+if ( -not ( test-path .\dist\pypi ) ) {
   mkdir .\dist\pypi
 }
 
