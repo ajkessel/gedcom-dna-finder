@@ -32,9 +32,14 @@ def check_codesigning_key():
 # auto-detected by PyInstaller. Conda names it ffi-8.dll (no lib prefix) and
 # places it under Library\bin; standard CPython uses libffi-8.dll in the
 # executable directory or DLLs\. Search all four combinations.
+#
+# tcl86t.dll / tk86t.dll are required by _tkinter.pyd. In a conda-forge
+# environment these live under Library\bin in the base environment (sys.base_prefix),
+# not under the venv Scripts directory, so PyInstaller's built-in hook misses them.
 _extra_binaries = []
 if sys.platform == 'win32':
     _base = os.path.dirname(sys.executable)
+    _conda_base = sys.base_prefix  # resolves to conda root even inside a venv
     for _pat in [
         os.path.join(_base, 'libffi*.dll'),
         os.path.join(_base, 'ffi*.dll'),
@@ -42,6 +47,11 @@ if sys.platform == 'win32':
         os.path.join(_base, 'DLLs', 'ffi*.dll'),
         os.path.join(_base, 'Library', 'bin', 'libffi*.dll'),
         os.path.join(_base, 'Library', 'bin', 'ffi*.dll'),
+        # TCL/TK DLLs — conda-forge places these in base_prefix, not the venv
+        os.path.join(_conda_base, 'DLLs', 'tk*.dll'),
+        os.path.join(_conda_base, 'DLLs', 'tcl*.dll'),
+        os.path.join(_conda_base, 'Library', 'bin', 'tk*.dll'),
+        os.path.join(_conda_base, 'Library', 'bin', 'tcl*.dll'),
     ]:
         _extra_binaries += [(p, '.') for p in glob.glob(_pat)]
 
