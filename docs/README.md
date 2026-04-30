@@ -110,7 +110,7 @@ If you want to compile executable versions of these scripts yourself, use
 [build.sh](../dev/build.sh) to compile for Linux or Mac and [build.ps1](../dev/build.ps1)
 to compile for Windows. The build script automatically creates a Python virtual environment and installs the required dependencies for the platform you are building on. These dependencies are only needed for building, not for running from source.
 
-I also have a custom [build_and_release.sh](dev/build_and_release.sh)
+I also have a custom [build_and_release.sh](../dev/build_and_release.sh)
 script which runs under WSL and builds for all three platforms if you have them 
 available.
 
