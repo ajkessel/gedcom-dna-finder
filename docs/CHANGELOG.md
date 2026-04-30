@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.0] - 2026-04-30
+
+- Major refactor and rationalization of code
+- Better data hygiene/privacy protection
+- Eliminated some edge case bugs
+
+### Added
+
+- **Top N and Max Depth persist across sessions** — the "Top N" and "Max Depth" spinboxes in the action bar are now also exposed in the Preferences dialog under a new "Search defaults" section. Values saved there are written to `settings.json` and restored on the next launch, so users no longer need to re-enter their preferred search depth after restarting the application.
+- **Clear Cache button in Preferences** — the Preferences dialog now includes a "Cache" section with a "Clear Cache…" button as an alternative to the existing Menu → Clear cache… entry, making it easier to find in the same place as other application settings.
+- **Privacy Policy menu item** — a new "Privacy Policy" entry at the bottom of the Menu opens a formatted window explaining what data the application stores locally, confirming that it makes no network requests, and describing the cache and its contents.
+- **PyPI packaging** — the project is now structured for distribution on PyPI as `gedcom-dna-finder`. A `pyproject.toml` with full metadata and entry points, a `gedcom_dna_finder/` Python package with `gedcom-dna-finder` (CLI) and `gedcom-dna-finder-gui` (GUI) console scripts, a `hatch_build.py` custom build hook that bundles `src/` scripts and assets into the wheel, and a `dev/build_pypi.ps1` build-and-upload script (supports `-TestPyPI` flag) are all included.
+
+### Changed
+
+- **People list: Birth and Death replace Years** — the single "Years" column in the people list has been replaced by separate "Birth" and "Death" columns, each showing only the respective year. Both columns are independently sortable by clicking the column heading.
+- **People list: ID column removed** — the GEDCOM ID column has been removed from the people list to reduce visual clutter. IDs continue to appear in results, Show Person windows, and the name links throughout the interface.
+
+### Fixed
+
+- **Main window clipped on launch with Large font** — when the application was configured to use the Large font and restarted, the main window was sometimes rendered at a width too narrow to show all action-bar controls. A single `update_idletasks()` call was insufficient for Tk to finish propagating geometry across all widget nesting levels before the width check ran. The fix schedules an additional `_refit_windows` call via `after(0, …)` so the check runs inside the event loop after layout has fully settled.
+- **Preferences window clipped with Large font** — the Preferences dialog used a hardcoded `420×360` pixel size set before any widgets were created, which was too small when the Large font was active. The dialog is now hidden on creation, all widgets are packed, `update_idletasks()` is called to compute the true required dimensions, and the window is then sized to fit and revealed — ensuring it is always the right size for the current font.
+
 ## [0.1.0] - 2026-04-29
 
 ### Added
