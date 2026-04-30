@@ -9,3 +9,9 @@ build_and_release.log
 .DS_Store
 icons/family_tree.ico
 icons/family_tree.icns
+src/__pycache__/
+gedcom_dna_finder/_scripts/
+gedcom_dna_finder/docs/
+gedcom_dna_finder/icons/
+*.egg-info/
+dev/old/

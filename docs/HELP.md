@@ -219,3 +219,15 @@ but is not the same as a genealogical relationship coefficient.
 ## Privacy
 
 The tool runs entirely locally on your machine. Nothing is uploaded.
+
+## Privacy & Cache
+
+To speed up repeated use of the same GEDCOM file, the GUI caches parsed data on disk. The cache is stored here:
+
+- **Windows:** `%APPDATA%\gedcom-dna-finder\cache\`
+- **macOS:** `~/Library/Application Support/gedcom-dna-finder/cache/`
+- **Linux:** `~/.config/gedcom-dna-finder/cache/`
+
+Cache files contain all parsed individual records from your GEDCOM: names, birth and death dates, and raw GEDCOM lines. If your `AppData` folder is synced to the cloud (OneDrive, Dropbox, iCloud Drive), genealogical data from your GEDCOM may be silently uploaded.
+
+To delete all cached files, choose **Menu → Clear cache…** in the GUI. The next time you load a file it will be re-parsed from disk and a fresh cache entry will be created.

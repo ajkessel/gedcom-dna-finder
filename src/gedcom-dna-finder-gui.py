@@ -22,34 +22,29 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.1.0"
-__release_date__ = "2026-04-29"
+__version__ = "0.2.0"
+__release_date__ = "2026-04-30"
 
 import argparse
-import hashlib
-import heapq
-import ctypes
 import difflib
-import json
 import os
-import pickle
 import re
 import sys
-import tempfile
-import zipfile
 from collections import deque
-from pathlib import Path
+
+from gedcom_core import (
+    bfs_find_dna_matches,
+    bfs_find_all_paths,
+    describe,
+    extract_ged_from_zip,
+)
+from gedcom_config import ConfigManager
+from gedcom_data_model import GedcomDataModel
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import tkinter.font as tkfont
 
-
-# ===========================================================================
-# Parsing / BFS engine (identical logic to the CLI script)
-# ===========================================================================
-
-LINE_RE = re.compile(r'^\s*(\d+)\s+(?:(@[^@]+@)\s+)?(\S+)(?:\s+(.*?))?\s*$')
 
 # Inline markdown: image (skip), link, bold, italic, code
 _INLINE_RE = re.compile(
@@ -61,359 +56,8 @@ _INLINE_RE = re.compile(
 )
 
 
-def iter_records(path):
-    record = []
-    with open(path, 'r', encoding='utf-8-sig', errors='replace') as f:
-        for raw in f:
-            line = raw.rstrip('\r\n')
-            if not line.strip():
-                continue
-            m = LINE_RE.match(line)
-            if not m:
-                continue
-            level = int(m.group(1))
-            xref = m.group(2)
-            tag = m.group(3)
-            value = m.group(4) or ''
-            if level == 0 and record:
-                yield record
-                record = []
-            record.append((level, xref, tag, value))
-    if record:
-        yield record
 
 
-def extract_year(date_str):
-    m = re.search(r'\b(\d{3,4})\b', date_str or '')
-    return int(m.group(1)) if m else None
-
-
-def build_model(gedcom_path, dna_keyword, page_marker):
-    records = list(iter_records(gedcom_path))
-
-    individuals = {}
-    families = {}
-    tag_records = {}
-
-    for rec in records:
-        head_level, head_xref, head_tag, _ = rec[0]
-        if head_level != 0 or head_xref is None:
-            continue
-        if head_tag == '_MTTAG':
-            tag_name = ''
-            for level, _xref, tag, value in rec[1:]:
-                if level == 1 and tag == 'NAME' and not tag_name:
-                    tag_name = value.strip()
-            tag_records[head_xref] = tag_name
-
-    page_marker_l = page_marker.lower()
-
-    for rec in records:
-        head_level, head_xref, head_tag, _ = rec[0]
-        if head_level != 0 or head_xref is None:
-            continue
-
-        if head_tag == 'INDI':
-            indi = {
-                'id': head_xref,
-                'name': '',
-                'alt_names': [],
-                'sex': '',
-                'famc': [],
-                'fams': [],
-                'dna_markers': [],
-                'birth_year': None,
-                'death_year': None,
-                '_mttag_refs': [],
-                '_raw': rec,
-            }
-            n = len(rec)
-            for i, (level, _xref, tag, value) in enumerate(rec):
-                if i == 0:
-                    continue
-                if level == 1 and tag == 'NAME':
-                    cleaned = value.replace('/', '').strip()
-                    if not indi['name']:
-                        indi['name'] = cleaned
-                    if cleaned:
-                        indi['alt_names'].append(cleaned)
-                elif level == 1 and tag == 'SEX':
-                    indi['sex'] = value.strip()
-                elif level == 1 and tag == 'FAMC':
-                    indi['famc'].append(value.strip())
-                elif level == 1 and tag == 'FAMS':
-                    indi['fams'].append(value.strip())
-                elif level == 1 and tag == '_MTTAG':
-                    v = value.strip()
-                    if v.startswith('@') and v.endswith('@'):
-                        indi['_mttag_refs'].append(v)
-                    else:
-                        for j in range(i + 1, n):
-                            l2, _, t2, v2 = rec[j]
-                            if l2 <= 1:
-                                break
-                            if l2 == 2 and t2 == 'NAME':
-                                if dna_keyword.lower() in v2.lower():
-                                    indi['dna_markers'].append(
-                                        f'_MTTAG (inline): {v2.strip()}'
-                                    )
-                                break
-                elif level == 1 and tag in ('BIRT', 'DEAT'):
-                    for j in range(i + 1, n):
-                        l2, _, t2, v2 = rec[j]
-                        if l2 <= 1:
-                            break
-                        if l2 == 2 and t2 == 'DATE':
-                            year = extract_year(v2)
-                            if year:
-                                if tag == 'BIRT':
-                                    indi['birth_year'] = year
-                                else:
-                                    indi['death_year'] = year
-                            break
-                elif tag == 'PAGE' and page_marker_l and page_marker_l in value.lower():
-                    indi['dna_markers'].append(
-                        f'Source citation: "{value.strip()}"'
-                    )
-            individuals[head_xref] = indi
-
-        elif head_tag == 'FAM':
-            fam = {'id': head_xref, 'husb': None, 'wife': None, 'chil': []}
-            for level, _xref, tag, value in rec[1:]:
-                if level == 1 and tag == 'HUSB':
-                    fam['husb'] = value.strip()
-                elif level == 1 and tag == 'WIFE':
-                    fam['wife'] = value.strip()
-                elif level == 1 and tag == 'CHIL':
-                    fam['chil'].append(value.strip())
-            families[head_xref] = fam
-
-    dna_kw_l = dna_keyword.lower()
-    for indi in individuals.values():
-        for ref in indi.pop('_mttag_refs'):
-            tag_name = tag_records.get(ref, '')
-            if tag_name and dna_kw_l in tag_name.lower():
-                indi['dna_markers'].append(f'Tags: {tag_name} ({ref})')
-
-    return individuals, families, tag_records
-
-
-def neighbors(indi_id, individuals, families):
-    indi = individuals.get(indi_id)
-    if not indi:
-        return
-    for fam_id in indi['famc']:
-        fam = families.get(fam_id)
-        if not fam:
-            continue
-        if fam['husb'] and fam['husb'] != indi_id:
-            yield fam['husb'], 'father'
-        if fam['wife'] and fam['wife'] != indi_id:
-            yield fam['wife'], 'mother'
-        for child_id in fam['chil']:
-            if child_id != indi_id:
-                yield child_id, 'sibling'
-    for fam_id in indi['fams']:
-        fam = families.get(fam_id)
-        if not fam:
-            continue
-        if fam['husb'] and fam['husb'] != indi_id:
-            yield fam['husb'], 'spouse'
-        if fam['wife'] and fam['wife'] != indi_id:
-            yield fam['wife'], 'spouse'
-        for child_id in fam['chil']:
-            yield child_id, 'child'
-
-
-def bfs_find_dna_matches(start_id, individuals, families, top_n, max_depth):
-    if start_id not in individuals:
-        return []
-    predecessor = {start_id: None}
-    queue = deque([(start_id, 0)])
-    found = []
-    while queue:
-        current_id, dist = queue.popleft()
-        if dist >= max_depth:
-            continue
-        for neighbor_id, edge_label in neighbors(current_id, individuals, families):
-            if neighbor_id in predecessor:
-                continue
-            predecessor[neighbor_id] = (current_id, edge_label)
-            new_dist = dist + 1
-            if individuals[neighbor_id]['dna_markers']:
-                found.append((new_dist, neighbor_id))
-                if len(found) >= top_n:
-                    break
-            queue.append((neighbor_id, new_dist))
-        if len(found) >= top_n:
-            break
-    results = []
-    for dist, end_id in found:
-        path = []
-        node = end_id
-        while node is not None:
-            pred = predecessor[node]
-            if pred is None:
-                path.append((node, None))
-                break
-            path.append((node, pred[1]))
-            node = pred[0]
-        path.reverse()
-        results.append((dist, path))
-    return results
-
-
-def _is_spouse_detour_of(longer, shorter):
-    """Return True if `longer` is `shorter` with one or more spouse-detour nodes inserted.
-
-    A spouse detour is a node S inserted before node N (where N is reached via
-    a 'spouse' edge from S) and N already appears in the shorter path. This
-    detects e.g. [A, B, grandmother, grandfather] being redundant with
-    [A, B, grandfather] when grandmother is grandfather's spouse.
-    """
-    shorter_ids = {nid for nid, _ in shorter}
-    shorter_list = [nid for nid, _ in shorter]
-    if longer[0][0] != shorter_list[0] or longer[-1][0] != shorter_list[-1]:
-        return False
-    if len(longer) <= len(shorter):
-        return False
-    filtered = []
-    i = 0
-    while i < len(longer):
-        nid, _ = longer[i]
-        if nid in shorter_ids:
-            filtered.append(nid)
-            i += 1
-        elif (i + 1 < len(longer)
-              and longer[i + 1][1] == 'spouse'
-              and longer[i + 1][0] in shorter_ids):
-            i += 1  # skip detour node; next iteration picks up the spouse target
-        else:
-            return False
-    return filtered == shorter_list
-
-
-def _filter_spouse_detours(paths):
-    """Remove paths that are spouse-detour variants of a shorter path in the same list."""
-    if len(paths) <= 1:
-        return paths
-    paths = sorted(paths, key=len)
-    kept = [paths[0]]
-    for candidate in paths[1:]:
-        if not any(_is_spouse_detour_of(candidate, keeper) for keeper in kept):
-            kept.append(candidate)
-    return kept
-
-
-def bfs_find_all_paths(start_id, end_id, individuals, families, top_n=5, max_depth=50):
-    """Find up to top_n distinct paths between start and end.
-
-    Phase 1: standard BFS (O(V+E)) to find the shortest distance.
-    Phase 2: path-tracking BFS to collect all simple paths up to
-             shortest_distance + 4 edges (or max_depth), whichever is smaller.
-
-    Returns (paths, truncated) where paths is a list of path lists and
-    truncated is True when the exploration cap was hit before finishing.
-    """
-    if start_id not in individuals or end_id not in individuals:
-        return [], False
-    if start_id == end_id:
-        return [[(start_id, None)]], False
-
-    # --- Phase 1: find shortest distance ---
-    seen = {start_id}
-    q1 = deque([(start_id, 0)])
-    shortest = None
-    while q1 and shortest is None:
-        curr, dist = q1.popleft()
-        if dist >= max_depth:
-            continue
-        for nbr, _ in neighbors(curr, individuals, families):
-            if nbr == end_id:
-                shortest = dist + 1
-                break
-            if nbr not in seen:
-                seen.add(nbr)
-                q1.append((nbr, dist + 1))
-
-    if shortest is None:
-        return [], False
-
-    DELTA = 4
-    length_limit = min(shortest + DELTA, max_depth)
-
-    # --- Phase 1.5: reverse BFS from end_id to build a distance-to-end map ---
-    # Phase 2 uses this to prune branches that cannot reach end_id within the
-    # remaining hops, turning an undirected exhaustive search into a directed one.
-    dist_to_end = {end_id: 0}
-    q_rev = deque([(end_id, 0)])
-    while q_rev:
-        curr, dist = q_rev.popleft()
-        if dist >= length_limit:
-            continue
-        for nbr, _ in neighbors(curr, individuals, families):
-            if nbr not in dist_to_end:
-                dist_to_end[nbr] = dist + 1
-                q_rev.append((nbr, dist + 1))
-
-    # --- Phase 2: A*-style path search ---
-    # Priority = g + h where g = edges used, h = dist_to_end[current].
-    # This explores paths in estimated-total-cost order, finding the shortest
-    # path in O(branching * depth) rather than the BFS O(branching^depth),
-    # which is what caused distant cousins (10+ hops) to exceed MAX_EXPLORE.
-    MAX_EXPLORE = 100_000
-
-    found = []
-    explored = 0
-    truncated = False
-    _seq = 0  # tie-breaker so the heap never compares path tuples
-
-    h0 = dist_to_end.get(start_id, length_limit + 1)
-    heap = [(h0, _seq, start_id, ((start_id, None),))]
-
-    while heap and len(found) < top_n:
-        if explored >= MAX_EXPLORE:
-            truncated = True
-            break
-        _, _, current_id, path = heapq.heappop(heap)
-        explored += 1
-
-        g = len(path) - 1  # edges used so far
-
-        path_visited = {nid for nid, _ in path}
-        for neighbor_id, edge_label in neighbors(current_id, individuals, families):
-            if neighbor_id in path_visited:
-                continue
-            h = dist_to_end.get(neighbor_id, length_limit + 1)
-            new_g = g + 1
-            if new_g + h > length_limit:
-                continue
-            new_path = path + ((neighbor_id, edge_label),)
-            if neighbor_id == end_id:
-                found.append(list(new_path))
-            else:
-                _seq += 1
-                heapq.heappush(heap, (new_g + h, _seq, neighbor_id, new_path))
-
-    found = _filter_spouse_detours(found)
-    return found, truncated
-
-
-def lifespan(indi):
-    b, d = indi.get('birth_year'), indi.get('death_year')
-    if b and d:
-        return f'{b}-{d}'
-    if b:
-        return f'b. {b}'
-    if d:
-        return f'd. {d}'
-    return ''
-
-
-def describe(indi):
-    name = indi['name'] or '(unknown)'
-    span = lifespan(indi)
-    return f'{name} ({span}) [{indi["id"]}]' if span else f'{name} [{indi["id"]}]'
 
 
 # ---------------------------------------------------------------------------
@@ -662,32 +306,6 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
 
 
 # ===========================================================================
-# ZIP support
-# ===========================================================================
-
-def _extract_ged_from_zip(zip_path):
-    """Return (temp_ged_path, entry_name) for the first .ged/.gedcom in a ZIP.
-
-    Prefers top-level entries over those inside subdirectories.
-    Caller is responsible for deleting the returned temp file.
-    """
-    with zipfile.ZipFile(zip_path, 'r') as zf:
-        ged_names = sorted(
-            [n for n in zf.namelist() if n.lower().endswith(('.ged', '.gedcom'))],
-            key=lambda n: (n.count('/'), n.lower()),
-        )
-        if not ged_names:
-            raise ValueError(
-                "No .ged or .gedcom file found inside the ZIP archive.")
-        chosen = ged_names[0]
-        data = zf.read(chosen)
-    tmp = tempfile.NamedTemporaryFile(suffix='.ged', delete=False)
-    tmp.write(data)
-    tmp.close()
-    return tmp.name, chosen
-
-
-# ===========================================================================
 # GUI
 # ===========================================================================
 
@@ -741,6 +359,9 @@ class DNAMatchFinderApp:
     }
 
     def __init__(self, root):
+        self._config = ConfigManager(ConfigManager.default_path())
+        self._model = GedcomDataModel()
+
         self.root = root
         self.root.title("GEDCOM DNA Match Finder")
         self.root.geometry("1100x720")
@@ -768,8 +389,8 @@ class DNAMatchFinderApp:
         self.search_text = tk.StringVar()
         self.filter_text = tk.StringVar()
         self.show_flagged_only = tk.BooleanVar(value=False)
-        self.top_n = tk.IntVar(value=3)
-        self.max_depth = tk.IntVar(value=50)
+        self.top_n = tk.IntVar(value=self._config.get_top_n())
+        self.max_depth = tk.IntVar(value=self._config.get_max_depth())
         self.status_text = tk.StringVar(value="No file loaded.")
 
         self.fuzzy_search = tk.BooleanVar(value=False)
@@ -800,15 +421,29 @@ class DNAMatchFinderApp:
         self._apply_font_size(self._font_size_pref)
         self._apply_theme(self._theme_pref)
 
+        # Remove any leftover .pkl files from the old pickle-based cache
+        try:
+            for _pkl in self._cache_dir().glob('*.pkl'):
+                _pkl.unlink(missing_ok=True)
+        except Exception:
+            pass
+
         self._build_ui()
 
         # Snap the initial window width up to what Tk actually needs so that
         # all action-bar buttons are fully visible on first launch.
+        # update_idletasks() is a best-effort pass; geometry propagation in Tk
+        # can require multiple idle rounds, so we also schedule a deferred
+        # refit that runs after the event loop starts and layout has settled.
+        # This is necessary when a non-default font (e.g. "large") is configured
+        # at startup, because a single update_idletasks() call may return a
+        # stale winfo_reqwidth() before all geometry passes have completed.
         self.root.update_idletasks()
         min_w = self.root.winfo_reqwidth()
         if min_w > self.root.winfo_width():
             self.root.geometry(f"{min_w}x{self.root.winfo_height()}")
         self.root.minsize(max(min_w, 800), 500)
+        self.root.after(0, self._refit_windows)
 
         # Re-open the most-recently-used file automatically on startup
         if self._recent_files and os.path.isfile(self._recent_files[0]):
@@ -886,18 +521,18 @@ class DNAMatchFinderApp:
 
         self.tree = ttk.Treeview(
             list_frame,
-            columns=('name', 'years', 'flagged', 'id'),
+            columns=('name', 'birth', 'death', 'flagged'),
             show='headings',
             selectmode='browse',
         )
         self.tree.heading('name', text='Name', command=lambda: self._sort_by('name'))
-        self.tree.heading('years', text='Years', command=lambda: self._sort_by('years'))
+        self.tree.heading('birth', text='Birth', command=lambda: self._sort_by('birth'))
+        self.tree.heading('death', text='Death', command=lambda: self._sort_by('death'))
         self.tree.heading('flagged', text='DNA?', command=lambda: self._sort_by('flagged'))
-        self.tree.heading('id', text='ID', command=lambda: self._sort_by('id'))
-        self.tree.column('name', width=260, anchor='w', stretch=True)
-        self.tree.column('years', width=80, anchor='w', stretch=False)
+        self.tree.column('name', width=240, anchor='w', stretch=True)
+        self.tree.column('birth', width=55, anchor='w', stretch=False)
+        self.tree.column('death', width=55, anchor='w', stretch=False)
         self.tree.column('flagged', width=50, anchor='center', stretch=False)
-        self.tree.column('id', width=90, anchor='w', stretch=False)
 
         ysb = ttk.Scrollbar(list_frame, orient='vertical',
                             command=self.tree.yview)
@@ -987,27 +622,11 @@ class DNAMatchFinderApp:
             messagebox.showerror("Not found", f"File not found:\n{path}")
             return
 
-        # --- Try cache first ---
-        cached = self._load_from_cache(path)
-        if cached:
-            self.individuals, self.families, self.tag_records = cached
-            self.sorted_ids = sorted(
-                self.individuals.keys(),
-                key=lambda iid: (self.individuals[iid]['name'].lower(), iid),
-            )
-            self._add_to_history(path)
-            self._home_person_id = self._load_home_person(path)
-            self._populate_tree()
-            self.status_text.set(
-                f"Loaded {len(self.individuals):,} individuals (from cache).")
-            return
-
-        # --- Full parse ---
         gedcom_path = path
         tmp_path = None
         if path.lower().endswith('.zip'):
             try:
-                tmp_path, ged_name = _extract_ged_from_zip(path)
+                tmp_path, ged_name = extract_ged_from_zip(path)
                 gedcom_path = tmp_path
                 self.status_text.set(f"Extracted {ged_name} from ZIP…")
             except Exception as e:
@@ -1019,10 +638,11 @@ class DNAMatchFinderApp:
         self.root.config(cursor="watch")
         self.root.update_idletasks()
         try:
-            self.individuals, self.families, self.tag_records = build_model(
+            from_cache, encoding_warning = self._model.load(
                 gedcom_path,
                 dna_keyword=self.tag_keyword.get(),
                 page_marker=self.page_marker.get(),
+                cache_dir=self._cache_dir(),
             )
         except Exception as e:
             self.root.config(cursor="")
@@ -1037,6 +657,13 @@ class DNAMatchFinderApp:
                 except OSError:
                     pass
 
+        self.individuals = self._model.individuals
+        self.families = self._model.families
+        self.tag_records = self._model.tag_records
+
+        if encoding_warning:
+            messagebox.showwarning("Encoding warning", encoding_warning)
+
         self.sorted_ids = sorted(
             self.individuals.keys(),
             key=lambda iid: (self.individuals[iid]['name'].lower(), iid),
@@ -1044,9 +671,11 @@ class DNAMatchFinderApp:
         self.root.config(cursor="")
         self._add_to_history(path)
         self._home_person_id = self._load_home_person(path)
-        self._save_to_cache(path, self.individuals, self.families,
-                            self.tag_records)
         self._populate_tree()
+        status = (f"Loaded {len(self.individuals):,} individuals (from cache)."
+                  if from_cache
+                  else f"Loaded {len(self.individuals):,} individuals.")
+        self.status_text.set(status)
 
     def _on_settings_change(self, *_):
         if self._settings_after_id is not None:
@@ -1065,17 +694,12 @@ class DNAMatchFinderApp:
         kind = self._last_result['type']
         start_id = self._last_result['start_id']
         if kind == 'dna_matches':
-            results = bfs_find_dna_matches(
-                start_id, self.individuals, self.families,
-                top_n=top_n, max_depth=max_depth,
-            )
+            results = self._model.find_dna_matches(start_id, top_n, max_depth)
             self._render_results(start_id, results)
         elif kind == 'path':
             end_id = self._last_result['end_id']
-            paths, truncated = bfs_find_all_paths(
-                start_id, end_id, self.individuals, self.families,
-                top_n=top_n, max_depth=max_depth,
-            )
+            paths, truncated = self._model.find_all_paths(
+                start_id, end_id, top_n, max_depth)
             self._render_path_results(start_id, end_id, paths, truncated)
 
     def _on_search_change(self, *_):
@@ -1103,7 +727,7 @@ class DNAMatchFinderApp:
             1 for i in self.individuals.values() if i['dna_markers'])
 
         # Update column heading sort indicators
-        _col_labels = {'name': 'Name', 'years': 'Years', 'flagged': 'DNA?', 'id': 'ID'}
+        _col_labels = {'name': 'Name', 'birth': 'Birth', 'death': 'Death', 'flagged': 'DNA?'}
         for _col, _label in _col_labels.items():
             suffix = (' ▼' if self._sort_rev else ' ▲') if _col == self._sort_col else ''
             self.tree.heading(_col, text=_label + suffix)
@@ -1111,13 +735,14 @@ class DNAMatchFinderApp:
         # Sort ids according to current sort column/direction
         def _sort_key(indi_id):
             indi = self.individuals[indi_id]
-            if self._sort_col == 'years':
+            if self._sort_col == 'birth':
                 by = indi['birth_year']
                 return (by is None, by or 0, indi['name'].lower())
+            if self._sort_col == 'death':
+                dy = indi['death_year']
+                return (dy is None, dy or 0, indi['name'].lower())
             if self._sort_col == 'flagged':
                 return (not bool(indi['dna_markers']), indi['name'].lower())
-            if self._sort_col == 'id':
-                return (indi_id,)
             return (indi['name'].lower(), indi_id)
 
         display_ids = sorted(self.sorted_ids, key=_sort_key, reverse=self._sort_rev)
@@ -1162,7 +787,9 @@ class DNAMatchFinderApp:
             self.tree.insert(
                 '', 'end', iid=indi_id,
                 values=(indi['name'] or '(unknown)',
-                        lifespan(indi), flagged_mark, indi_id),
+                        indi['birth_year'] or '',
+                        indi['death_year'] or '',
+                        flagged_mark),
                 tags=tags,
             )
             shown += 1
@@ -1226,10 +853,7 @@ class DNAMatchFinderApp:
             messagebox.showerror(
                 "Bad value", "Top N and Max depth must be integers.")
             return
-        results = bfs_find_dna_matches(
-            start_id, self.individuals, self.families,
-            top_n=top_n, max_depth=max_depth,
-        )
+        results = self._model.find_dna_matches(start_id, top_n, max_depth)
         self._last_result = {'type': 'dna_matches', 'start_id': start_id}
         self._render_results(start_id, results)
 
@@ -1589,18 +1213,18 @@ class DNAMatchFinderApp:
 
         picker_tree = ttk.Treeview(
             list_frame,
-            columns=('name', 'years', 'flagged', 'id'),
+            columns=('name', 'birth', 'death', 'flagged'),
             show='headings',
             selectmode='browse',
         )
         picker_tree.heading('name', text='Name')
-        picker_tree.heading('years', text='Years')
+        picker_tree.heading('birth', text='Birth')
+        picker_tree.heading('death', text='Death')
         picker_tree.heading('flagged', text='DNA?')
-        picker_tree.heading('id', text='ID')
-        picker_tree.column('name', width=260, anchor='w', stretch=True)
-        picker_tree.column('years', width=80, anchor='w', stretch=False)
+        picker_tree.column('name', width=240, anchor='w', stretch=True)
+        picker_tree.column('birth', width=55, anchor='w', stretch=False)
+        picker_tree.column('death', width=55, anchor='w', stretch=False)
         picker_tree.column('flagged', width=50, anchor='center', stretch=False)
-        picker_tree.column('id', width=90, anchor='w', stretch=False)
         picker_tree.tag_configure('flagged_row', background='#fff4cc')
 
         ysb = ttk.Scrollbar(list_frame, orient='vertical',
@@ -1631,7 +1255,9 @@ class DNAMatchFinderApp:
                 picker_tree.insert(
                     '', 'end', iid=indi_id,
                     values=(indi['name'] or '(unknown)',
-                            lifespan(indi), flagged_mark, indi_id),
+                            indi['birth_year'] or '',
+                            indi['death_year'] or '',
+                            flagged_mark),
                     tags=tags,
                 )
                 shown += 1
@@ -1687,10 +1313,8 @@ class DNAMatchFinderApp:
             top_n = int(self.top_n.get())
         except (tk.TclError, ValueError):
             top_n = 5
-        paths, truncated = bfs_find_all_paths(
-            start_id, target_id, self.individuals, self.families,
-            top_n=top_n, max_depth=max_depth,
-        )
+        paths, truncated = self._model.find_all_paths(
+            start_id, target_id, top_n, max_depth)
         self._last_result = {'type': 'path',
                              'start_id': start_id, 'end_id': target_id}
         self._render_path_results(start_id, target_id, paths, truncated)
@@ -1741,124 +1365,48 @@ class DNAMatchFinderApp:
         self.results.configure(state='disabled')
 
     # ---------------------------------------------------------- History / config
-    def _config_path(self):
-        if sys.platform == 'win32':
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                "com.ajkessel.gedcom-dna-finder")
-            base = Path(os.environ.get('APPDATA', Path.home()))
-        elif sys.platform == 'darwin':
-            base = Path.home() / 'Library' / 'Application Support'
-        else:
-            base = Path(os.environ.get(
-                'XDG_CONFIG_HOME', Path.home() / '.config'))
-        return base / 'gedcom-dna-finder' / 'settings.json'
+    def _cache_dir(self):
+        return self._config._path.parent / 'cache'
 
     def _load_history(self):
-        try:
-            data = json.loads(self._config_path().read_text(encoding='utf-8'))
-            return [p for p in data.get('recent_files', []) if isinstance(p, str)]
-        except Exception:
-            return []
+        return self._config.get_recent_files()
 
     def _save_history(self, history):
-        cfg = self._config_path()
-        try:
-            data = json.loads(cfg.read_text(encoding='utf-8'))
-        except Exception:
-            data = {}
-        data['recent_files'] = history
-        cfg.parent.mkdir(parents=True, exist_ok=True)
-        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        self._config.set_recent_files(history)
 
     def _add_to_history(self, filepath):
         history = [filepath] + [p for p in self._recent_files if p != filepath]
         history = history[:self.MAX_RECENT]
         self._recent_files = history
         self.path_combo['values'] = history
-        self._save_history(history)
+        self._config.set_recent_files(history)
 
-    # ---------------------------------------------------------- Cache
-    def _cache_dir(self):
-        return self._config_path().parent / 'cache'
-
-    def _cache_path(self, gedcom_path):
-        key = os.path.normcase(os.path.abspath(gedcom_path)).encode()
-        return self._cache_dir() / (hashlib.md5(key).hexdigest() + '.pkl')
-
-    def _load_from_cache(self, gedcom_path):
-        """Return (individuals, families, tag_records) from cache, or None on miss."""
-        try:
-            cache_file = self._cache_path(gedcom_path)
-            if not cache_file.exists():
-                return None
-            file_mtime = os.path.getmtime(gedcom_path)
-            with cache_file.open('rb') as f:
-                data = pickle.load(f)
-            if (data.get('mtime') != file_mtime
-                    or data.get('dna_keyword') != self.tag_keyword.get()
-                    or data.get('page_marker') != self.page_marker.get()):
-                return None
-            return data['individuals'], data['families'], data['tag_records']
-        except Exception:
-            return None
-
-    def _save_to_cache(self, gedcom_path, individuals, families, tag_records):
-        """Write parsed model to cache using an atomic temp-file rename."""
-        try:
-            cache_dir = self._cache_dir()
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            cache_file = self._cache_path(gedcom_path)
-            payload = {
-                'mtime': os.path.getmtime(gedcom_path),
-                'dna_keyword': self.tag_keyword.get(),
-                'page_marker': self.page_marker.get(),
-                'individuals': individuals,
-                'families': families,
-                'tag_records': tag_records,
-            }
-            tmp = cache_file.with_suffix('.tmp')
-            with tmp.open('wb') as f:
-                pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-            tmp.replace(cache_file)
-        except Exception:
-            pass  # cache write failure is non-fatal
+    def _clear_cache(self):
+        cache_dir = self._cache_dir()
+        files = list(cache_dir.glob('*.json')) if cache_dir.exists() else []
+        if not files:
+            messagebox.showinfo("Cache", "No cache files found.")
+            return
+        if messagebox.askyesno(
+            "Clear cache",
+            f"Delete {len(files)} cached file(s)?\n\n"
+            "Note: the cache may contain personal information (names, dates) "
+            "from your GEDCOM files."
+        ):
+            deleted = self._model.clear_cache(cache_dir)
+            messagebox.showinfo("Cache cleared", f"{deleted} file(s) deleted.")
 
     def _load_home_person(self, gedcom_path):
-        """Return the stored home-person ID for this GEDCOM file, or None."""
-        try:
-            data = json.loads(self._config_path().read_text(encoding='utf-8'))
-            return data.get('home_persons', {}).get(gedcom_path)
-        except Exception:
-            return None
+        return self._config.get_home_person(gedcom_path)
 
     def _save_home_person(self, gedcom_path, indi_id):
-        """Persist the home-person ID for this GEDCOM file."""
-        cfg = self._config_path()
-        try:
-            data = json.loads(cfg.read_text(encoding='utf-8'))
-        except Exception:
-            data = {}
-        data.setdefault('home_persons', {})[gedcom_path] = indi_id
-        cfg.parent.mkdir(parents=True, exist_ok=True)
-        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        self._config.set_home_person(gedcom_path, indi_id)
 
     def _load_font_preference(self):
-        try:
-            data = json.loads(self._config_path().read_text(encoding='utf-8'))
-            pref = data.get('font_size', 'medium')
-            return pref if pref in self._FONT_SIZES else 'medium'
-        except Exception:
-            return 'medium'
+        return self._config.get_font_preference(self._FONT_SIZES)
 
     def _save_font_preference(self, size_name):
-        cfg = self._config_path()
-        try:
-            data = json.loads(cfg.read_text(encoding='utf-8'))
-        except Exception:
-            data = {}
-        data['font_size'] = size_name
-        cfg.parent.mkdir(parents=True, exist_ok=True)
-        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        self._config.set_font_preference(size_name)
 
     def _apply_font_size(self, size_name):
         sizes = self._FONT_SIZES[size_name]
@@ -2015,38 +1563,23 @@ class DNAMatchFinderApp:
         recolor(self.root)
 
     def _load_theme_preference(self):
-        try:
-            data = json.loads(self._config_path().read_text(encoding='utf-8'))
-            pref = data.get('theme', 'Default')
-            return pref if pref in self._THEME_NAMES else 'Default'
-        except Exception:
-            return 'Default'
+        return self._config.get_theme_preference(self._THEME_NAMES)
 
     def _save_theme_preference(self, theme_name):
-        cfg = self._config_path()
-        try:
-            data = json.loads(cfg.read_text(encoding='utf-8'))
-        except Exception:
-            data = {}
-        data['theme'] = theme_name
-        cfg.parent.mkdir(parents=True, exist_ok=True)
-        cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        self._config.set_theme_preference(theme_name)
 
     def _show_preferences(self):
         original_font = self._font_size_pref
         original_theme = self._theme_pref
+        original_top_n = self.top_n.get()
+        original_max_depth = self.max_depth.get()
 
         win = tk.Toplevel(self.root)
         win.title("Preferences")
         win.resizable(False, False)
         win.transient(self.root)
         win.grab_set()
-
-        self.root.update_idletasks()
-        dw, dh = 420, 210
-        px = self.root.winfo_x() + (self.root.winfo_width() - dw) // 2
-        py = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
-        win.geometry(f"{dw}x{dh}+{px}+{py}")
+        win.withdraw()  # hide until sized; avoids a flicker at the wrong size
 
         outer = ttk.Frame(win, padding=16)
         outer.pack(fill='both', expand=True)
@@ -2079,6 +1612,27 @@ class DNAMatchFinderApp:
                 command=on_theme_change,
             ).pack(side='left', padx=6)
 
+        search_frame = ttk.LabelFrame(outer, text="Search defaults", padding=(12, 6))
+        search_frame.pack(fill='x', pady=(0, 8))
+
+        ttk.Label(search_frame, text="Top N results:").grid(
+            row=0, column=0, sticky='w', padx=(0, 8))
+        top_n_var = tk.IntVar(value=self.top_n.get())
+        ttk.Spinbox(search_frame, from_=1, to=20, textvariable=top_n_var,
+                    width=6).grid(row=0, column=1, sticky='w', padx=(0, 24))
+        ttk.Label(search_frame, text="Max depth:").grid(
+            row=0, column=2, sticky='w', padx=(0, 8))
+        max_depth_var = tk.IntVar(value=self.max_depth.get())
+        ttk.Spinbox(search_frame, from_=1, to=200, textvariable=max_depth_var,
+                    width=6).grid(row=0, column=3, sticky='w')
+
+        cache_frame = ttk.LabelFrame(outer, text="Cache", padding=(12, 6))
+        cache_frame.pack(fill='x', pady=(0, 8))
+        ttk.Button(cache_frame, text="Clear Cache…",
+                   command=self._clear_cache).pack(side='left')
+        ttk.Label(cache_frame, text="Remove all cached GEDCOM data").pack(
+            side='left', padx=(10, 0))
+
         btn_frame = ttk.Frame(outer)
         btn_frame.pack(fill='x', pady=(8, 0))
 
@@ -2086,35 +1640,47 @@ class DNAMatchFinderApp:
             self._font_size_pref = size_var.get()
             self._save_font_preference(self._font_size_pref)
             self._save_theme_preference(theme_var.get())
+            try:
+                self.top_n.set(max(1, int(top_n_var.get())))
+                self._config.set_top_n(self.top_n.get())
+            except (tk.TclError, ValueError):
+                pass
+            try:
+                self.max_depth.set(max(1, int(max_depth_var.get())))
+                self._config.set_max_depth(self.max_depth.get())
+            except (tk.TclError, ValueError):
+                pass
             win.destroy()
 
         def on_cancel():
             self._apply_font_size(original_font)
             self._apply_theme(original_theme)
+            self.top_n.set(original_top_n)
+            self.max_depth.set(original_max_depth)
             win.destroy()
 
         ttk.Button(btn_frame, text="OK", command=on_ok).pack(side='right', padx=(4, 0))
         ttk.Button(btn_frame, text="Cancel", command=on_cancel).pack(side='right')
 
+        # Size and centre after all widgets are built so the window fits
+        # whatever font is currently active (small / medium / large).
+        win.update_idletasks()
+        req_w = win.winfo_reqwidth()
+        req_h = win.winfo_reqheight()
+        self.root.update_idletasks()
+        px = self.root.winfo_x() + (self.root.winfo_width() - req_w) // 2
+        py = self.root.winfo_y() + (self.root.winfo_height() - req_h) // 2
+        win.geometry(f"{req_w}x{req_h}+{px}+{py}")
+        win.deiconify()
+
     def _load_show_person_geometry(self):
-        try:
-            data = json.loads(self._config_path().read_text(encoding='utf-8'))
-            return data.get('show_person_geometry')
-        except Exception:
-            return None
+        return self._config.get_window_geometry('show_person_geometry')
 
     def _persist_show_person_geometry(self, win):
         try:
             geo = win.geometry()
             self._show_person_geometry = geo
-            cfg = self._config_path()
-            try:
-                data = json.loads(cfg.read_text(encoding='utf-8'))
-            except Exception:
-                data = {}
-            data['show_person_geometry'] = geo
-            cfg.parent.mkdir(parents=True, exist_ok=True)
-            cfg.write_text(json.dumps(data, indent=2), encoding='utf-8')
+            self._config.set_window_geometry('show_person_geometry', geo)
         except Exception:
             pass
 
@@ -2200,13 +1766,16 @@ class DNAMatchFinderApp:
         self.root.config(menu=menubar)
 
         app_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label='Menu', menu=app_menu)
+        menubar.add_cascade(label='Menu', underline=0, menu=app_menu)
         app_menu.add_command(label='Preferences…', command=self._show_preferences)
+        app_menu.add_command(label='Clear cache…', command=self._clear_cache)
         app_menu.add_separator()
         app_menu.add_command(label='How to use', command=self._show_how_to_use)
         app_menu.add_command(label='Keyboard shortcuts',
                              command=self._show_keyboard_shortcuts)
+        app_menu.add_command(label='Privacy Policy', command=self._show_privacy_policy)
         app_menu.add_command(label='About', command=self._show_about)
+        
 
         # macOS supplies Quit via Cmd+Q automatically; only add it explicitly elsewhere.
         if sys.platform != 'darwin':
@@ -2238,6 +1807,12 @@ class DNAMatchFinderApp:
             "About",
             self._resource_path('docs/LICENSE.md'), markdown=True,
             preamble=f"# GEDCOM DNA Match Finder  v{__version__} ({__release_date__})\n\n",
+        )
+
+    def _show_privacy_policy(self):
+        self._show_file_window(
+            "Privacy Policy",
+            self._resource_path('docs/PRIVACY_POLICY.md'), markdown=True,
         )
 
     def _show_file_window(self, title, filepath, markdown=False, preamble=""):
