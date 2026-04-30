@@ -33,8 +33,11 @@ python3 -m pip install --upgrade build hatchling twine
 echo "==> Cleaning previous dist/ output..."
 rm -rf dist/
 
-echo "==> Building wheel and sdist..."
-python3 -m build dev/ --outdir dist/
+echo "==> Building sdist..."
+python3 -m build -s dev/ --outdir dist/
+
+echo "==> Building wheel..."
+python3 -m build -w dev/ --outdir dist/
 
 echo "==> Built artifacts:"
 ls -lh dist/

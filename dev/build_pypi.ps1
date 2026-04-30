@@ -27,8 +27,11 @@ python -m pip install --upgrade build hatchling twine
 Write-Host "==> Cleaning previous dist/ output..."
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 
-Write-Host "==> Building wheel and sdist..."
-python -m build dev/ --outdir dist/
+Write-Host "==> Building sdist..."
+python -m build -s dev/ --outdir dist/
+
+Write-Host "==> Building wheel..."
+python -m build -w dev/ --outdir dist/
 
 Write-Host "==> Built artifacts:"
 Get-ChildItem dist | Select-Object Name, Length | Format-Table -AutoSize

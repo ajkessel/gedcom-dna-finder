@@ -32,8 +32,22 @@ class CustomBuildHook(BuildHookInterface):
     _ASSET_DIRS = ("docs", "icons")
 
     def initialize(self, version, build_data):
-        repo = Path(self.root).parent          # repo root (one level above dev/)
+        hook_dir = Path(self.root)
+
+        # When building from the source tree, self.root is dev/ and the repo
+        # root is its parent.  When building a wheel from an extracted sdist
+        # (the second phase of `python -m build`), the sdist includes src/
+        # and gedcom_dna_finder/ as siblings of hatch_build.py, so self.root
+        # itself is the effective repo root.
+        if (hook_dir.parent / "src").exists():
+            repo = hook_dir.parent   # source-tree build
+        elif (hook_dir / "src").exists():
+            repo = hook_dir          # wheel-from-sdist build
+        else:
+            return                   # can't locate sources — skip
+
         pkg = repo / "gedcom_dna_finder"
+        pkg.mkdir(parents=True, exist_ok=True)
 
         # --- scripts -------------------------------------------------------
         scripts_dst = pkg / "_scripts"
@@ -52,9 +66,11 @@ class CustomBuildHook(BuildHookInterface):
             if src_dir.exists():
                 shutil.copytree(src_dir, dst_dir)
 
-        # No build_data["artifacts"] manipulation needed: the static
-        # force-include in pyproject.toml covers the entire gedcom_dna_finder/
-        # tree and is evaluated after this hook runs.
+        # Tell hatchling to include the populated package directory in the wheel.
+        # Using a dynamic entry here (rather than a static pyproject.toml path)
+        # so it resolves to the correct absolute path whether we're in the real
+        # source tree or a temp sdist extraction directory.
+        build_data["force_include"][str(pkg)] = "gedcom_dna_finder"
 
     def finalize(self, version, build_data, artifact_path):
         pkg = Path(self.root).parent / "gedcom_dna_finder"
