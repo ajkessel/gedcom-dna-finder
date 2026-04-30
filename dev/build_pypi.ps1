@@ -21,27 +21,35 @@ $ErrorActionPreference = "Stop"
 
 Set-Location -Path "$PSScriptRoot\.."
 
+if ( test-path ( .\venv\Scripts\Activate.ps1 ) ) {
+  & ".\venv\Scripts\Activate.ps1"
+}
+
+if ( -not ( test-path ( .\dist\pypi ) ) ) {
+  mkdir .\dist\pypi
+}
+
 Write-Host "==> Installing / upgrading build tools..."
 python -m pip install --upgrade build hatchling twine
 
 Write-Host "==> Cleaning previous dist/ output..."
-Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force dist/pypi -ErrorAction SilentlyContinue
 
 Write-Host "==> Building sdist..."
-python -m build -s dev/ --outdir dist/
+python -m build -s dev/ --outdir dist/pypi
 
 Write-Host "==> Building wheel..."
-python -m build -w dev/ --outdir dist/
+python -m build -w dev/ --outdir dist/pypi
 
 Write-Host "==> Built artifacts:"
-Get-ChildItem dist | Select-Object Name, Length | Format-Table -AutoSize
+Get-ChildItem dist/pypi | Select-Object Name, Length | Format-Table -AutoSize
 
 if ($TestPyPI) {
     Write-Host "==> Uploading to TestPyPI (https://test.pypi.org)..."
-    python -m twine upload --repository testpypi dist/*
+    python -m twine upload --repository testpypi dist/pypi/*
 } else {
     Write-Host "==> Uploading to PyPI..."
-    python -m twine upload dist/*
+    python -m twine upload dist/pypi/*
 }
 
 Write-Host "==> Done."

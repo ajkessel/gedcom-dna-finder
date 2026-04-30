@@ -27,27 +27,30 @@ done
 
 cd "$(dirname "$0")/.."
 
+[[ -e .venv/bin/activate ]] && source .venv/bin/activate
+
 echo "==> Installing / upgrading build tools..."
 python3 -m pip install --upgrade build hatchling twine
 
 echo "==> Cleaning previous dist/ output..."
-rm -rf dist/
+mkdir -p dist/pypi
+rm -rf dist/pypi
 
 echo "==> Building sdist..."
-python3 -m build -s dev/ --outdir dist/
+python3 -m build -s dev/ --outdir dist/pypi
 
 echo "==> Building wheel..."
-python3 -m build -w dev/ --outdir dist/
+python3 -m build -w dev/ --outdir dist/pypi
 
 echo "==> Built artifacts:"
-ls -lh dist/
+ls -lh dist/pypi
 
 if [ "$TEST_PYPI" -eq 1 ]; then
     echo "==> Uploading to TestPyPI (https://test.pypi.org)..."
-    python3 -m twine upload --repository testpypi dist/*
+    python3 -m twine upload --repository testpypi dist/pypi/*
 else
     echo "==> Uploading to PyPI..."
-    python3 -m twine upload dist/*
+    python3 -m twine upload dist/pypi/*
 fi
 
 echo "==> Done."
