@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gedcom-dna-finder"
-version = "0.2.1"
+version = "0.2.2"
 description = "Find the nearest DNA-flagged relatives in a GEDCOM family tree"
 readme = {file = "../docs/README.md", content-type = "text/markdown"}
 license = {text = "BSD-2-Clause"}

@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.0] - 2026-04-30
+## [0.2.2] - 2026-04-30
 
 - Major refactor and rationalization of code
 - Better data hygiene/privacy protection

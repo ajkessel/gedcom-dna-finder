@@ -22,7 +22,7 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.2"
 __release_date__ = "2026-04-30"
 
 import argparse
