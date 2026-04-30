@@ -62,7 +62,7 @@ a = Analysis(
     pathex=[],
     binaries=_extra_binaries,
     datas=[('../docs/HELP.md', './docs'), ('../docs/LICENSE.md', './docs'),
-           ('../docs/KEYBOARD_SHORTCUTS.md', './docs'), ('../docs/PRIVACY_POLICY.md', '.'),
+           ('../docs/KEYBOARD_SHORTCUTS.md', './docs'), ('../docs/PRIVACY_POLICY.md', './docs'),
            ('../icons/family_tree.ico', './icons'), ('../icons/family_tree.png', './icons')],
     hiddenimports=[],
     hookspath=[],
