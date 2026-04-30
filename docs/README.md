@@ -350,7 +350,7 @@ If you follow these steps and are seeing an error along the lines of "This file 
 ## License
 
 This project is released under the BSD 2-Clause License. See the
-[`LICENSE`](LICENSE) file for the full text.
+[`LICENSE`](LICENSE.md) file for the full text.
 
 ## Recent changes
 
