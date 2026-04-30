@@ -94,25 +94,58 @@ standard library.
 
 ## Installation
 
+### Pre-built executables
 
 Download the [latest release for your operating system](https://github.com/ajkessel/gedcom-dna-finder/releases/latest).
+No Python installation required.
 
-Alternatively, to run from source:
+### pip (PyPI)
+
+```
+pip install gedcom-dna-finder
+```
+
+After installation two commands are available:
+
+| Command | Description |
+| --- | --- |
+| `gedcom-dna-finder` | Command-line interface |
+| `gedcom-dna-finder-gui` | Graphical interface |
+
+The GUI requires Tkinter, which ships with the official Python installers on
+Windows and macOS. On most Linux distributions it is in a separate package:
+
+```
+# Debian / Ubuntu
+sudo apt install python3-tk
+
+# Fedora
+sudo dnf install python3-tkinter
+
+# Arch
+sudo pacman -S tk
+```
+
+### Run from source
+
 ```
 git clone https://github.com/ajkessel/gedcom-dna-finder.git
 cd gedcom-dna-finder
+python src/gedcom-dna-finder-gui.py        # GUI
+python src/gedcom-dna-finder-cli.py --help # CLI
 ```
 
-That's the whole installation. The two scripts are independent and
-can be run from anywhere.
+No third-party libraries are needed to run from source.
 
-If you want to compile executable versions of these scripts yourself, use
-[build.sh](../dev/build.sh) to compile for Linux or Mac and [build.ps1](../dev/build.ps1)
-to compile for Windows. The build script automatically creates a Python virtual environment and installs the required dependencies for the platform you are building on. These dependencies are only needed for building, not for running from source.
+### Build executables yourself
 
-I also have a custom [build_and_release.sh](../dev/build_and_release.sh)
-script which runs under WSL and builds for all three platforms if you have them 
-available.
+Use [build.sh](../dev/build.sh) to compile for Linux or Mac and
+[build.ps1](../dev/build.ps1) for Windows. The build script automatically
+creates a Python virtual environment and installs the required dependencies.
+These dependencies are only needed for building, not for running from source.
+
+A [build_and_release.sh](../dev/build_and_release.sh) script is also
+available that builds for all three platforms under WSL.
 
 ## Usage
 
