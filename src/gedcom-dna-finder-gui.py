@@ -22,15 +22,18 @@ Pure stdlib. Requires Python 3 with tkinter (standard on Windows / macOS;
 on Linux you may need a python3-tk package).
 """
 
-__version__ = "0.2.2"
-__release_date__ = "2026-04-30"
-
 import argparse
 import difflib
 import os
 import re
 import sys
 from collections import deque
+
+try:
+    from gedcom_dna_finder import __version__, __release_date__
+except ImportError:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+    from gedcom_dna_finder import __version__, __release_date__
 
 from gedcom_core import (
     bfs_find_dna_matches,

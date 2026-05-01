@@ -7,6 +7,14 @@ import subprocess
 import re
 from PyInstaller.utils.hooks import collect_data_files
 
+# Read version and release date from the single source of truth.
+_init_path = os.path.join(os.path.dirname(os.path.abspath(SPECFILE)),
+                          '..', 'gedcom_dna_finder', '__init__.py')
+with open(_init_path) as _f:
+    _init_src = _f.read()
+_app_version = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', _init_src).group(1)
+_app_release_date = re.search(r'__release_date__\s*=\s*["\']([^"\']+)["\']', _init_src).group(1)
+
 
 def check_codesigning_key():
     """
@@ -121,7 +129,9 @@ if sys.platform == 'darwin':
                  info_plist={
                      'CFBundleSupportedPlatforms': ['MacOSX'],
                      'LSMinimumSystemVersion': '10.13.0',
-                     'CFBundleVersion': '1.0',
+                     'CFBundleShortVersionString': _app_version,
+                     'CFBundleVersion': _app_version,
+                     'NSHumanReadableCopyright': f'Copyright {_app_release_date[:4]} Adam Kessel',
                      'NSHighResolutionCapable': True,
                      'LSApplicationCategoryType': 'public.app-category.utilities',
                  })
