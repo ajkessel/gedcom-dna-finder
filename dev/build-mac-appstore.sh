@@ -20,6 +20,19 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	# Ensure all files are readable by non-root users (App Store error 90255).
 	chmod -R a+rX "${APP_AS}"
 
+	# Embed provisioning profile (required for TestFlight eligibility).
+	PROVISION_PROFILE="${HOME}/Library/MobileDevice/Provisioning Profiles/gedcom-dna-finder.provisionprofile"
+	if [[ ! -f "${PROVISION_PROFILE}" ]]; then
+		PROVISION_PROFILE="$(dirname "$0")/gedcom-dna-finder.provisionprofile"
+	fi
+	if [[ -f "${PROVISION_PROFILE}" ]]; then
+		cp "${PROVISION_PROFILE}" "${APP_AS}/Contents/embedded.provisionprofile"
+		echo "Embedded provisioning profile from: ${PROVISION_PROFILE}"
+	else
+		echo "WARNING: No provisioning profile found; app will not be TestFlight-eligible."
+		echo "  Place gedcom-dna-finder.provisionprofile in ~/Library/MobileDevice/Provisioning Profiles/ or dev/"
+	fi
+
 	# Re-sign bottom-up with the App Store identity.
 	# --deep triggers errSecInternalComponent on Python .so extension modules,
 	# so sign nested components individually first, then the executable, then
