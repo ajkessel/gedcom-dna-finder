@@ -1185,7 +1185,11 @@ class DNAMatchFinderApp:
             return
         win = tk.Toplevel(self.root)
         win.title("_MTTAG definitions")
-        win.geometry("450x400")
+        dw, dh = 450, 400
+        self.root.update_idletasks()
+        px = self.root.winfo_x() + (self.root.winfo_width() - dw) // 2
+        py = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
+        win.geometry(f"{dw}x{dh}+{px}+{py}")
         text = scrolledtext.ScrolledText(
             win, font=self._mono_font, wrap='none')
         text.pack(fill='both', expand=True)
@@ -1842,11 +1846,15 @@ class DNAMatchFinderApp:
 
         win = tk.Toplevel(self.root)
         win.title(title)
-        win.geometry("820x640")
         win.minsize(500, 300)
         win.transient(self.root)
         win.grab_set()
         win.bind('<Escape>', lambda _: win.destroy())
+        dw, dh = 820, 640
+        self.root.update_idletasks()
+        px = self.root.winfo_x() + (self.root.winfo_width() - dw) // 2
+        py = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
+        win.geometry(f"{dw}x{dh}+{px}+{py}")
 
         text = scrolledtext.ScrolledText(win, wrap='word', padx=12, pady=8)
         text.pack(fill='both', expand=True)
