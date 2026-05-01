@@ -90,11 +90,24 @@ if [[ -n "${AS_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	cp -R "${APP_SRC}" "${APP_AS}"
 
-	# Deep-sign every binary inside the bundle with the App Store identity.
-	# --deep ensures nested frameworks/.dylibs are signed before the outer
-	# bundle, satisfying library-validation without the disable-library-
-	# validation entitlement that App Store review rejects.
-	codesign --deep --force --verify --verbose \
+	# Sign from the inside out: .so/.dylib first, then frameworks, then the
+	# bundle. --deep is deprecated and fails on PyInstaller bundles with many
+	# nested extension modules (errSecInternalComponent).
+	find "${APP_AS}/Contents" \( -name "*.so" -o -name "*.dylib" \) | while read -r f; do
+		codesign --force --verify --sign "${AS_CERT}" \
+			--entitlements "./dev/entitlements-appstore.plist" "${f}" || {
+			echo "App Store code-signing failed on: ${f}"
+			exit 1
+		}
+	done
+	find "${APP_AS}/Contents/Frameworks" -maxdepth 1 -name "*.framework" | while read -r f; do
+		codesign --force --verify --sign "${AS_CERT}" \
+			--entitlements "./dev/entitlements-appstore.plist" "${f}" || {
+			echo "App Store code-signing failed on: ${f}"
+			exit 1
+		}
+	done
+	codesign --force --verify --verbose \
 		--sign "${AS_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
 		"${APP_AS}" || {
