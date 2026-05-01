@@ -103,6 +103,7 @@ if sys.platform == 'darwin':
               name='gedcom-dna-finder',
               codesign_identity=check_codesigning_key(),
               entitlements_file=os.path.join(SPECPATH, 'entitlements.plist'),
+              target_arch='universal2',
               console=False)
 
     coll = COLLECT(exe,
