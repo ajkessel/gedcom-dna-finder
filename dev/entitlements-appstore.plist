@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Required by the Mac App Store -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <!-- Required for Python's bytecode compiler and ctypes JIT -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <!-- Required for PyInstaller's bootloader and Python's memory allocator -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Allow the user to open GEDCOM files via the file picker -->
+    <key>com.apple.security.files.user-selected.read-only</key>
+    <true/>
+</dict>
+</plist>
