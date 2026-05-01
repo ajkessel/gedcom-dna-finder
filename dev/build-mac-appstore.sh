@@ -1,4 +1,5 @@
 #!/bin/bash
+security unlock-keychain -p "`cat ~/.config/p`" ~/Library/Keychains/login.keychain-db
 AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null |
 	grep "3rd Party Mac Developer Application" |
 	grep -Eo '[0-9A-Z]{40}' | head -1)
@@ -65,9 +66,12 @@ fi
 echo "Submitting App Store package to app store..."
 apiKey=$(cat "${HOME}/.appstoreconnect/apikey.txt")
 apiIssuer=$(cat "${HOME}/.appstoreconnect/apiissuer.txt")
-[ -z "${apiKey}" ] || [ -z "${apiIssuer}" ] && {
-  echo "Need apikey and apiissuer to subimt to app store."
+appid=$(cat "${HOME}/.appstoreconnect/appid.txt")
+version=$(grep __version__ gedcom_dna_finder/__init__.py | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+[ -z "${apiKey}" ] || [ -z "${apiIssuer}" ] || [ -z "${version}" ] || [ -z "${appid}" ] && {
+  echo "Need apiKey, apiIssuer, version, and appid to be set for app store upload."
   exit 1
 }
 xcrun altool --validate-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
-xcrun altool --upload-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
+#xcrun altool --upload-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
+xcrun altool --upload-package dist/gedcom-dna-finder.pkg  --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string "${version}" --bundle-version "${version}"  --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}
