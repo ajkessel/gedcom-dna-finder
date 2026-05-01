@@ -94,13 +94,13 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	cp -R "${APP_SRC}" "${APP_AS}"
 
-	codesign --verify --verbose \
-		--sign "${AS_APP_CERT}" \
-		--entitlements "./dev/entitlements-appstore.plist" \
-		"${APP_AS}" || {
-		echo "App Store code-signing failed."
-		exit 1
-	}
+	# codesign --verify --verbose \
+	# 	--sign "${AS_APP_CERT}" \
+	# 	--entitlements "./dev/entitlements-appstore.plist" \
+	# 	"${APP_AS}" || {
+	# 	echo "App Store code-signing failed."
+	# 	exit 1
+	# }
 
 	productbuild \
 		--component "${APP_AS}" /Applications \

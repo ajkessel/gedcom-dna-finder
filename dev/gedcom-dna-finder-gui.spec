@@ -120,5 +120,6 @@ if sys.platform == 'darwin':
                  info_plist={
                      'CFBundleSupportedPlatforms': ['MacOSX'],
                      'LSMinimumSystemVersion': '10.13.0',
+                     'CFBundleVersion': '1.0',
                      'NSHighResolutionCapable': True,
                  })
