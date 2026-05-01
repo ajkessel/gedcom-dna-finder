@@ -71,6 +71,10 @@ pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
 	echo 'Cannot find dist build folder.'
 	exit 1
 }
+AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null |
+	grep "3rd Party Mac Developer Application" |
+	grep -Eo '[0-9A-Z]{40}' | head -1)
+codesign -s "${AS_APP_CERT}" -f --timestamp -o runtime -i "com.ajkessel.gedcom-dna-finder" "dist/gedcom-dna-finder.app"
 ditto -c -k --sequesterRsrc "dist/gedcom-dna-finder.app" "${out}"
 xcrun notarytool submit "${out}" --keychain-profile "notarytool-profile" --wait
 xcrun stapler staple ./dist/gedcom-dna-finder.app
