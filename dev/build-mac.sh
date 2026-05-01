@@ -76,12 +76,12 @@ mv "${out}" dist/
 #   "3rd Party Mac Developer Application: ..." (signs the .app)
 #   "3rd Party Mac Developer Installer: ..."   (signs the .pkg)
 # Both are downloaded from the Apple Developer portal.
-AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null \
-	| grep "3rd Party Mac Developer Application" \
-	| grep -Eo '[0-9A-Z]{40}' | head -1)
-AS_INST_CERT=$(security find-identity -v 2>/dev/null \
-	| grep "3rd Party Mac Developer Installer" \
-	| grep -Eo '[0-9A-Z]{40}' | head -1)
+AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null |
+	grep "3rd Party Mac Developer Application" |
+	grep -Eo '[0-9A-Z]{40}' | head -1)
+AS_INST_CERT=$(security find-identity -v 2>/dev/null |
+	grep "3rd Party Mac Developer Installer" |
+	grep -Eo '[0-9A-Z]{40}' | head -1)
 
 if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	echo "Building App Store package..."
