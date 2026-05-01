@@ -25,6 +25,7 @@ export PYENV_ROOT="$HOME/.pyenv"
 	echo 'Installing pyenv for python 3.14.4'
 	mkdir -p "${PYENV_ROOT}"
 	eval "$(pyenv init -)"
+	export PYTHON_CONFIGURE_OPTS="--enable-universal-archs=universal2 --with-universal-archs=universal2"
 	pyenv install 3.14.4
 	pyenv global 3.14.4
 }
