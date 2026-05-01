@@ -96,14 +96,30 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	# Ensure all files are readable by non-root users (App Store error 90255).
 	chmod -R a+rX "${APP_AS}"
 
-	# Re-sign with the App Store identity and sandbox entitlements.
-	# --force overrides the existing Developer-ID signature; --deep signs
-	# nested frameworks and dylibs before the outer bundle (error 90296).
-	codesign --force --deep --verbose \
+	# Re-sign bottom-up with the App Store identity.
+	# --deep triggers errSecInternalComponent on Python .so extension modules,
+	# so sign nested components individually first, then the executable, then
+	# the bundle. The sandbox entitlement only needs to be on the main executable.
+	while IFS= read -r -d '' f; do
+		codesign --force --sign "${AS_APP_CERT}" "$f" || {
+			echo "App Store code-signing failed on: $f"
+			exit 1
+		}
+	done < <(find "${APP_AS}" -type f \( -name "*.so" -o -name "*.dylib" \) -print0)
+
+	codesign --force --verbose \
+		--sign "${AS_APP_CERT}" \
+		--entitlements "./dev/entitlements-appstore.plist" \
+		"${APP_AS}/Contents/MacOS/gedcom-dna-finder" || {
+		echo "App Store code-signing of main executable failed."
+		exit 1
+	}
+
+	codesign --force --verbose \
 		--sign "${AS_APP_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
 		"${APP_AS}" || {
-		echo "App Store code-signing failed."
+		echo "App Store code-signing of bundle failed."
 		exit 1
 	}
 
