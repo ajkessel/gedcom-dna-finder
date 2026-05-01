@@ -19,7 +19,7 @@ pip install -r ./dev/requirements.txt || {
 	echo 'Failed to install dependencies.'
 	exit 1
 }
-python3 ./dev/generate_icon.py ./icons/family_tree.png || {
+python3 ./dev/generate-icon.py ./icons/family_tree.png || {
 	echo 'Failed to generate ICO file.'
 	exit 1
 }

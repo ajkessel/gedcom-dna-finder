@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# dev/build_pypi.sh
+# dev/build-pypi.sh
 #
 # Builds a wheel + sdist and uploads them to PyPI via Twine.
 # Run from any directory; the script repositions to the repo root.
@@ -11,8 +11,8 @@
 #     or be prepared to enter them interactively.
 #
 # Usage:
-#   ./dev/build_pypi.sh             # build + upload to PyPI
-#   ./dev/build_pypi.sh --test-pypi # build + upload to test.pypi.org
+#   ./dev/build-pypi.sh             # build + upload to PyPI
+#   ./dev/build-pypi.sh --test-pypi # build + upload to test.pypi.org
 #
 
 set -euo pipefail

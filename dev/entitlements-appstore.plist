@@ -5,6 +5,8 @@
     <!-- Required by the Mac App Store -->
     <key>com.apple.security.app-sandbox</key>
     <true/>
+    <key>com.apple.application-identifier</key>
+    <string>4GT4UKXZ4V.com.ajkessel.gedcom-dna-finder</string>
     <!-- Required for Python's bytecode compiler and ctypes JIT -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>

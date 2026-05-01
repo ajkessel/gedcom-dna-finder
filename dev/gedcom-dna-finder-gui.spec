@@ -129,6 +129,7 @@ if sys.platform == 'darwin':
                  info_plist={
                      'CFBundleSupportedPlatforms': ['MacOSX'],
                      'LSMinimumSystemVersion': '10.13.0',
+                     'CFBundleIdentifier': 'com.ajkessel.gedcom-dna-finder',
                      'CFBundleShortVersionString': _app_version,
                      'CFBundleVersion': _app_version,
                      'NSHumanReadableCopyright': f'Copyright {_app_release_date[:4]} Adam Kessel',

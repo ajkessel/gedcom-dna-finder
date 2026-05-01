@@ -5,7 +5,8 @@ venv/
 build/
 dist/
 *.zip
-build_and_release.log
+build-and-release.log
+build-mac-appstore.log
 .DS_Store
 icons/family_tree.ico
 icons/family_tree.icns
@@ -15,3 +16,4 @@ gedcom_dna_finder/docs/
 gedcom_dna_finder/icons/
 *.egg-info/
 dev/old/
+dev/gedcom-dna-finder.provisionprofile

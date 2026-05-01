@@ -1,4 +1,4 @@
-# dev/build_pypi.ps1
+# dev/build-pypi.ps1
 #
 # Builds a wheel + sdist and uploads them to PyPI via Twine.
 # Run from any directory; the script repositions to the repo root.
@@ -9,8 +9,8 @@
 #     or be prepared to enter them interactively.
 #
 # Usage:
-#   .\dev\build_pypi.ps1             # build + upload to PyPI
-#   .\dev\build_pypi.ps1 -TestPyPI  # build + upload to test.pypi.org
+#   .\dev\build-pypi.ps1             # build + upload to PyPI
+#   .\dev\build-pypi.ps1 -TestPyPI  # build + upload to test.pypi.org
 #
 param(
     [switch]$TestPyPI

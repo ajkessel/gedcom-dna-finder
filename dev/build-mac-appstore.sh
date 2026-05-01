@@ -1,5 +1,20 @@
 #!/bin/bash
+if [[ "$STDBUF_ACTIVE" != "1" ]]; then
+  export STDBUF_ACTIVE=1
+  exec stdbuf -oL "$0" "$@"
+fi
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+cd "${SCRIPT_DIR}/.."
+exec > >(sed 's/\x1b\[[0-9;]*m//g' | tee -a build-mac-appstore.log) 2>&1
+echo '--------------------------------'
+echo "Building app for Mac App Store."
+date
+echo '--------------------------------'
 security unlock-keychain -p "`cat ~/.config/p`" ~/Library/Keychains/login.keychain-db
+if [[ ! -e 'dist/gedcom-dna-finder.app' ]]; then
+  echo 'Built app not found, building now.'
+  ./dev/build.sh
+fi
 AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null |
 	grep "3rd Party Mac Developer Application" |
 	grep -Eo '[0-9A-Z]{40}' | head -1)
@@ -17,13 +32,13 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	cp -R "${APP_SRC}" "${APP_AS}"
 
-	# Ensure all files are readable by non-root users (App Store error 90255).
-	chmod -R a+rX "${APP_AS}"
-
 	# Embed provisioning profile (required for TestFlight eligibility).
-  PROVISION_PROFILE="${HOME}/.appstoreconnect/Mac.provisionprofile"
+  PROVISION_PROFILE="${HOME}/Library/MobileDevice/Provisioning Profiles/gedcom-dna-finder.provisionprofile"
 	if [[ ! -f "${PROVISION_PROFILE}" ]]; then
 		PROVISION_PROFILE="$(dirname "$0")/gedcom-dna-finder.provisionprofile"
+	fi
+	if [[ ! -f "${PROVISION_PROFILE}" ]]; then
+		PROVISION_PROFILE="dev/gedcom-dna-finder.provisionprofile"
 	fi
 	if [[ -f "${PROVISION_PROFILE}" ]]; then
 		cp "${PROVISION_PROFILE}" "${APP_AS}/Contents/embedded.provisionprofile"
@@ -32,6 +47,9 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 		echo "WARNING: No provisioning profile found; app will not be TestFlight-eligible."
 		echo "  Place gedcom-dna-finder.provisionprofile in ~/Library/MobileDevice/Provisioning Profiles/ or dev/"
 	fi
+  #
+	# Ensure all files are readable by non-root users (App Store error 90255).
+	chmod -R a+rX "${APP_AS}"
 
 	# Re-sign bottom-up with the App Store identity.
 	# --deep triggers errSecInternalComponent on Python .so extension modules,
@@ -42,8 +60,20 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 			echo "App Store code-signing failed on: $f"
 			exit 1
 		}
-	done < <(find "${APP_AS}" -type f \( -name "*.so" -o -name "*.dylib" \) -print0)
+	done < <(find "${APP_AS}" -type f \( -name "*.so" -o -name "*.dylib" -o -name 'Python' \) -print0)
 
+  find "${APP_AS}" -type f -perm +111 -exec codesign --force --options runtime --sign "${AS_APP_CERT}" {} \;
+
+  echo "Signing provisioning profile."
+	codesign --force --verbose \
+		--sign "${AS_APP_CERT}" \
+		--entitlements "./dev/entitlements-appstore.plist" \
+		"${APP_AS}/Contents/embedded.provisionprofile" || {
+		echo "App Store code-signing of provision profile failed."
+		exit 1
+	}
+
+  echo "Signing entitlements."
 	codesign --force --verbose \
 		--sign "${AS_APP_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
@@ -85,6 +115,9 @@ version=$(grep __version__ gedcom_dna_finder/__init__.py | grep -o '[0-9]\+\.[0-
   echo "Need apiKey, apiIssuer, version, and appid to be set for app store upload."
   exit 1
 }
+# optional steps - not use to submit to app store
 #xcrun altool --validate-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
 #xcrun altool --upload-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
-xcrun altool --upload-package dist/gedcom-dna-finder.pkg  --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string "${version}" --bundle-version "${version}"  --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
+echo 'Uploading with the following command:'
+echo xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string 0.2.4 --bundle-version 0.2.4 --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
+xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string 0.2.4 --bundle-version 0.2.4 --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"

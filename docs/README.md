@@ -145,7 +145,7 @@ Use [build.sh](../dev/build.sh) to compile for Linux or Mac and
 creates a Python virtual environment and installs the required dependencies.
 These dependencies are only needed for building, not for running from source.
 
-A [build_and_release.sh](../dev/build_and_release.sh) script is also
+A [build-and-release.sh](../dev/build-and-release.sh) script is also
 available that builds for all three platforms under WSL.
 
 ## Usage

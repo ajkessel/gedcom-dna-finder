@@ -2,9 +2,13 @@
 # script for building and uploading executables to Github
 # intended to run from WSL instance with access to local powershell and remote mac at hostname vmac
 # include -c as command line switch to create new release, otherwise latest release will be used
+if [[ "$STDBUF_ACTIVE" != "1" ]]; then
+  export STDBUF_ACTIVE=1
+  exec stdbuf -oL "$0" "$@"
+fi
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."
-exec > >(sed 's/\x1b\[[0-9;]*m//g' | tee -a build_and_release.log) 2>&1
+exec > >(sed 's/\x1b\[[0-9;]*m//g' | tee -a build-and-release.log) 2>&1
 printf -- "---------------------------------\ngedcom-dna-finder build log\n$(date)\n---------------------------------\n"
 if [ "$1" == "-c" ]; then
 	gh release create
