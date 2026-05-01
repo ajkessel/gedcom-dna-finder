@@ -116,4 +116,9 @@ if sys.platform == 'darwin':
     app = BUNDLE(coll,
                  name='gedcom-dna-finder.app',
                  icon='../icons/family_tree.icns',
-                 bundle_identifier='com.ajkessel.gedcom-dna-finder')
+                 bundle_identifier='com.ajkessel.gedcom-dna-finder',
+                 info_plist={
+                     'CFBundleSupportedPlatforms': ['MacOSX'],
+                     'LSMinimumSystemVersion': '10.13.0',
+                     'NSHighResolutionCapable': True,
+                 })

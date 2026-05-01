@@ -94,11 +94,7 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	cp -R "${APP_SRC}" "${APP_AS}"
 
-	# Deep-sign every binary inside the bundle with the App Store identity.
-	# --deep ensures nested frameworks/.dylibs are signed before the outer
-	# bundle, satisfying library-validation without the disable-library-
-	# validation entitlement that App Store review rejects.
-	codesign --deep --force --verify --verbose \
+	codesign --verify --verbose \
 		--sign "${AS_APP_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
 		"${APP_AS}" || {
