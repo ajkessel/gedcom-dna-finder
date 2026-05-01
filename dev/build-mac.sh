@@ -90,23 +90,33 @@ if [[ -n "${AS_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	cp -R "${APP_SRC}" "${APP_AS}"
 
+	# Clear extended attributes (quarantine flags etc.) that can cause
+	# errSecInternalComponent during signing of copied bundles.
+	xattr -cr "${APP_AS}"
+
+	# Extend keychain unlock timeout so it doesn't re-lock mid-signing when
+	# there are many nested binaries to process.
+	security set-keychain-settings -t 3600 "${HOME}/Library/Keychains/login.keychain-db"
+
 	# Sign from the inside out: .so/.dylib first, then frameworks, then the
-	# bundle. --deep is deprecated and fails on PyInstaller bundles with many
-	# nested extension modules (errSecInternalComponent).
-	find "${APP_AS}/Contents" \( -name "*.so" -o -name "*.dylib" \) | while read -r f; do
+	# bundle. Use process substitution (not a pipe) so exit 1 actually stops
+	# the script. --deep is deprecated and fails on PyInstaller bundles.
+	while IFS= read -r -d '' f; do
 		codesign --force --verify --sign "${AS_CERT}" \
 			--entitlements "./dev/entitlements-appstore.plist" "${f}" || {
 			echo "App Store code-signing failed on: ${f}"
 			exit 1
 		}
-	done
-	find "${APP_AS}/Contents/Frameworks" -maxdepth 1 -name "*.framework" | while read -r f; do
+	done < <(find "${APP_AS}/Contents" \( -name "*.so" -o -name "*.dylib" \) -print0)
+
+	while IFS= read -r -d '' f; do
 		codesign --force --verify --sign "${AS_CERT}" \
 			--entitlements "./dev/entitlements-appstore.plist" "${f}" || {
 			echo "App Store code-signing failed on: ${f}"
 			exit 1
 		}
-	done
+	done < <(find "${APP_AS}/Contents/Frameworks" -maxdepth 1 -name "*.framework" -print0)
+
 	codesign --force --verify --verbose \
 		--sign "${AS_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
