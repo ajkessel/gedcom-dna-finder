@@ -183,6 +183,26 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
     def chain():
         return "'s ".join(_edge_to_term(edges[i], sexes[i + 1]) for i in range(len(edges)))
 
+    def segmented():
+        """Split at first *internal* spouse crossing and describe each part.
+
+        e.g. [father, sibling, child, child, spouse, father, father, father]
+        → "first cousin once removed's wife's great-grandfather"
+        Returns None when no useful split is possible.
+        """
+        sp_idx = next((i for i, e in enumerate(edges) if e == 'spouse'), None)
+        if sp_idx is None or sp_idx == 0:
+            return None
+        seg1 = path[:sp_idx + 1]
+        spouse_id = path[sp_idx + 1][0]
+        spouse_sex = individuals.get(spouse_id, {}).get('sex', '')
+        sp_term = ('wife' if spouse_sex == 'F'
+                   else 'husband' if spouse_sex == 'M' else 'spouse')
+        seg2 = [(spouse_id, None)] + list(path[sp_idx + 2:])
+        rel1 = describe_relationship(seg1, individuals)
+        rel2 = describe_relationship(seg2, individuals) if len(seg2) > 1 else ''
+        return f"{rel1}'s {sp_term}'s {rel2}" if rel2 else f"{rel1}'s {sp_term}"
+
     def ancestor_term(n, sex):
         if n == 1:
             return 'father' if sex == 'M' else ('mother' if sex == 'F' else 'parent')
@@ -230,7 +250,7 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
         trail_sp += 1
         inner.pop()
     if not inner or lead_sp > 1 or trail_sp > 1 or (lead_sp and trail_sp):
-        return chain()
+        return segmented() or chain()
 
     # Validate inner: all-up → optional single sibling → all-down.
     # If the sequence fails because of interior spouse edges (path navigated
@@ -279,7 +299,7 @@ def describe_relationship(path, individuals, ancestors=None, descendants=None):
             if trimmed:
                 u, d, s, valid = _classify(trimmed)
     if not valid:
-        return chain()
+        return segmented() or chain()
 
     u_eff = u + s
     d_eff = d + s
@@ -1338,20 +1358,40 @@ class DNAMatchFinderApp:
         self._render_path_results(start_id, target_id, paths, truncated)
 
     def _render_path_results(self, start_id, end_id, paths, truncated=False):
-        start = self.individuals[start_id]
-        end = self.individuals[end_id]
-        lines = [
-            "Relationship path:",
-            f"  From: {describe(start)}",
-            f"  To:   {describe(end)}",
-            "",
-        ]
+        w = self.results
+        w.configure(state='normal')
+        w.delete('1.0', 'end')
+        self._clear_person_tags(w)
+
+        w.tag_configure('person_link')
+        w.tag_bind('person_link', '<Enter>', lambda _: w.config(cursor='hand2'))
+        w.tag_bind('person_link', '<Leave>', lambda _: w.config(cursor=''))
+
+        def nl(text='', bold=False):
+            w.insert('end', text + '\n', ('bold',) if bold else ())
+
+        def person(indi_id, prefix='', suffix=''):
+            if prefix:
+                w.insert('end', prefix)
+            tag = f'pers_{indi_id.strip("@")}'
+            w.insert('end', describe(self.individuals[indi_id]),
+                     ('person_link', tag))
+            w.tag_configure(tag, foreground=self._link_color, underline=True)
+            w.tag_bind(tag, '<Button-1>',
+                       lambda _, iid=indi_id: self._navigate_to(iid))
+            if suffix:
+                w.insert('end', suffix)
+            w.insert('end', '\n')
+
+        nl("Relationship path:", bold=True)
+        person(start_id, prefix="  From: ")
+        person(end_id,   prefix="  To:   ")
+        nl()
+
         if start_id == end_id:
-            lines.append("(Same person selected for both.)")
+            nl("(Same person selected for both.)")
         elif not paths:
-            lines.append(
-                f"No relationship path found within max depth {self.max_depth.get()}."
-            )
+            nl(f"No relationship path found within max depth {self.max_depth.get()}.")
         else:
             ancestors = get_ancestor_depths(
                 start_id, self.individuals, self.families)
@@ -1361,26 +1401,19 @@ class DNAMatchFinderApp:
                 dist = len(path) - 1
                 rel = describe_relationship(path, self.individuals,
                                             ancestors=ancestors, descendants=descendants)
-                lines.append(
-                    f"Path #{rank} — {rel} ({dist} edge{'s' if dist != 1 else ''}):")
+                nl(f"Path #{rank} — {rel} ({dist} edge{'s' if dist != 1 else ''}):", bold=True)
                 for i, (node_id, edge) in enumerate(path):
-                    indi = self.individuals[node_id]
                     if i == 0:
-                        lines.append(f"  {describe(indi)}")
+                        person(node_id, prefix="  ")
                     else:
-                        lines.append(f"    --[{edge}]--> {describe(indi)}")
-                lines.append("")
+                        person(node_id, prefix=f"    --[{edge}]--> ")
+                nl()
             if truncated:
-                lines.append(
-                    "(Search cap reached — there may be additional paths. "
-                    "Reduce Max depth to search a smaller area.)"
-                )
-        lines.append("")
+                nl("(Search cap reached — there may be additional paths. "
+                   "Reduce Max depth to search a smaller area.)")
+        nl()
 
-        self.results.configure(state='normal')
-        self.results.delete('1.0', 'end')
-        self.results.insert('1.0', '\n'.join(lines))
-        self.results.configure(state='disabled')
+        w.configure(state='disabled')
 
     # ---------------------------------------------------------- History / config
     def _cache_dir(self):

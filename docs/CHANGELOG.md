@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.5] - 2026-05-01
+
+### Added
+
+- **Clickable person links in relationship path results** — every person name displayed in the "Relationship path" results pane is now a clickable blue underlined hyperlink. Clicking a name navigates to that person in the people list and runs "Find Nearest DNA Matches", consistent with name links elsewhere in the UI. The "Relationship path:" header and each "Path #N" line are rendered in bold for easier scanning.
+
+### Improved
+
+- **Relationship descriptions for spouse-crossing paths** — a new `segmented()` helper in `describe_relationship` splits a path at the first spouse crossing and describes each segment independently before falling back to the raw edge chain. Paths like `cousin → spouse → ancestor` now produce readable labels such as "first cousin once removed's wife's great-grandfather" instead of an opaque possessive chain.
+- **Popup windows centered on parent** — the Tag definitions window and the Show Person window now open centered over the main application window instead of appearing at an arbitrary screen position.
+
 ## [0.2.2] - 2026-04-30
 
 - Major refactor and rationalization of code
