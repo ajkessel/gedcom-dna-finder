@@ -122,4 +122,5 @@ if sys.platform == 'darwin':
                      'LSMinimumSystemVersion': '10.13.0',
                      'CFBundleVersion': '1.0',
                      'NSHighResolutionCapable': True,
+                     'LSApplicationCategoryType': 'public.app-category.utilities',
                  })

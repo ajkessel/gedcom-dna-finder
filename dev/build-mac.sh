@@ -64,7 +64,7 @@ pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
 	echo 'Cannot find dist build folder.'
 	exit 1
 }
-rm dist/gedcom-dna-finder dist/gedcom-dna-finder-cli
+rm dist/gedcom-dna-finder-cli
 ditto -c -k --sequesterRsrc "dist/" "${out}"
 xcrun notarytool submit "${out}" --keychain-profile "notarytool-profile" --wait
 xcrun stapler staple ./dist/gedcom-dna-finder.app
@@ -94,13 +94,19 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	cp -R "${APP_SRC}" "${APP_AS}"
 
-	# codesign --verify --verbose \
-	# 	--sign "${AS_APP_CERT}" \
-	# 	--entitlements "./dev/entitlements-appstore.plist" \
-	# 	"${APP_AS}" || {
-	# 	echo "App Store code-signing failed."
-	# 	exit 1
-	# }
+	# Ensure all files are readable by non-root users (App Store error 90255).
+	chmod -R a+rX "${APP_AS}"
+
+	# Re-sign with the App Store identity and sandbox entitlements.
+	# --force overrides the existing Developer-ID signature; --deep signs
+	# nested frameworks and dylibs before the outer bundle (error 90296).
+	codesign --force --deep --verbose \
+		--sign "${AS_APP_CERT}" \
+		--entitlements "./dev/entitlements-appstore.plist" \
+		"${APP_AS}" || {
+		echo "App Store code-signing failed."
+		exit 1
+	}
 
 	productbuild \
 		--component "${APP_AS}" /Applications \
