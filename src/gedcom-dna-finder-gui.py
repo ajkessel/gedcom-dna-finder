@@ -29,15 +29,22 @@ import re
 import sys
 from collections import deque
 
-try:
-    from gedcom_dna_finder import __version__, __release_date__
-except ImportError:
-    # Frozen PyInstaller bundle: package is extracted to sys._MEIPASS.
-    # Source run: package lives one level above the src/ directory.
-    _root = getattr(sys, '_MEIPASS',
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
-    sys.path.insert(0, _root)
-    from gedcom_dna_finder import __version__, __release_date__
+def _read_version():
+    _bases = []
+    if getattr(sys, 'frozen', False):
+        _bases.append(sys._MEIPASS)
+    _bases.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+    for _base in _bases:
+        _path = os.path.join(_base, 'gedcom_dna_finder', '__init__.py')
+        if os.path.isfile(_path):
+            _src = open(_path).read()
+            _v = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', _src)
+            _d = re.search(r'__release_date__\s*=\s*["\']([^"\']+)["\']', _src)
+            if _v and _d:
+                return _v.group(1), _d.group(1)
+    return 'unknown', 'unknown'
+
+__version__, __release_date__ = _read_version()
 
 from gedcom_core import (
     bfs_find_dna_matches,
