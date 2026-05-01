@@ -75,6 +75,6 @@ ditto -c -k --sequesterRsrc "dist/gedcom-dna-finder.app" "${out}"
 xcrun notarytool submit "${out}" --keychain-profile "notarytool-profile" --wait
 xcrun stapler staple ./dist/gedcom-dna-finder.app
 rm "${out}"
-ditto -c -k --sequesterRsrc "dist/" "${out}"
+ditto -c -k  --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${out}"
 mv "${out}" dist/
 
