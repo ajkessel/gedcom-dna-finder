@@ -32,7 +32,11 @@ from collections import deque
 try:
     from gedcom_dna_finder import __version__, __release_date__
 except ImportError:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+    # Frozen PyInstaller bundle: package is extracted to sys._MEIPASS.
+    # Source run: package lives one level above the src/ directory.
+    _root = getattr(sys, '_MEIPASS',
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+    sys.path.insert(0, _root)
     from gedcom_dna_finder import __version__, __release_date__
 
 from gedcom_core import (
