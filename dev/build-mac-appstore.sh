@@ -21,7 +21,7 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	chmod -R a+rX "${APP_AS}"
 
 	# Embed provisioning profile (required for TestFlight eligibility).
-	PROVISION_PROFILE="${HOME}/Library/MobileDevice/Provisioning Profiles/gedcom-dna-finder.provisionprofile"
+  PROVISION_PROFILE="${HOME}/.appstoreconnect/Mac.provisionprofile"
 	if [[ ! -f "${PROVISION_PROFILE}" ]]; then
 		PROVISION_PROFILE="$(dirname "$0")/gedcom-dna-finder.provisionprofile"
 	fi
@@ -85,6 +85,6 @@ version=$(grep __version__ gedcom_dna_finder/__init__.py | grep -o '[0-9]\+\.[0-
   echo "Need apiKey, apiIssuer, version, and appid to be set for app store upload."
   exit 1
 }
-xcrun altool --validate-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
+#xcrun altool --validate-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
 #xcrun altool --upload-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
-xcrun altool --upload-package dist/gedcom-dna-finder.pkg  --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string "${version}" --bundle-version "${version}"  --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}
+xcrun altool --upload-package dist/gedcom-dna-finder.pkg  --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string "${version}" --bundle-version "${version}"  --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
