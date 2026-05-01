@@ -64,8 +64,7 @@ pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
 	echo 'Cannot find dist build folder.'
 	exit 1
 }
-rm dist/gedcom-dna-finder-cli
-ditto -c -k --sequesterRsrc "dist/" "${out}"
+ditto -c -k --sequesterRsrc "dist/gedcom-dna-finder.app" "${out}"
 xcrun notarytool submit "${out}" --keychain-profile "notarytool-profile" --wait
 xcrun stapler staple ./dist/gedcom-dna-finder.app
 rm "${out}"
