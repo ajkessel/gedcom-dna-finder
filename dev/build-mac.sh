@@ -73,14 +73,18 @@ ditto -c -k --sequesterRsrc "dist/" "${out}"
 mv "${out}" dist/
 
 # ── App Store package (.pkg) ────────────────────────────────────────────────
-# Requires the "Apple Distribution" certificate in the keychain (used for
-# both .app signing and .pkg signing in modern Xcode / Apple toolchains).
-# Download it from the Apple Developer portal.
-AS_CERT=$(security find-identity -v -p codesigning 2>/dev/null \
-	| grep "Apple Distribution" \
+# Requires two certificates in the keychain:
+#   "3rd Party Mac Developer Application: ..." (signs the .app)
+#   "3rd Party Mac Developer Installer: ..."   (signs the .pkg)
+# Both are downloaded from the Apple Developer portal.
+AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null \
+	| grep "3rd Party Mac Developer Application" \
+	| grep -Eo '[0-9A-Z]{40}' | head -1)
+AS_INST_CERT=$(security find-identity -v 2>/dev/null \
+	| grep "3rd Party Mac Developer Installer" \
 	| grep -Eo '[0-9A-Z]{40}' | head -1)
 
-if [[ -n "${AS_CERT}" ]]; then
+if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	echo "Building App Store package..."
 	APP_SRC="dist/gedcom-dna-finder.app"
 	APP_AS="dist/gedcom-dna-finder-appstore.app"
@@ -90,35 +94,12 @@ if [[ -n "${AS_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	cp -R "${APP_SRC}" "${APP_AS}"
 
-	# Clear extended attributes (quarantine flags etc.) that can cause
-	# errSecInternalComponent during signing of copied bundles.
-	xattr -cr "${APP_AS}"
-
-	# Extend keychain unlock timeout so it doesn't re-lock mid-signing when
-	# there are many nested binaries to process.
-	security set-keychain-settings -t 3600 "${HOME}/Library/Keychains/login.keychain-db"
-
-	# Sign from the inside out: .so/.dylib first, then frameworks, then the
-	# bundle. Use process substitution (not a pipe) so exit 1 actually stops
-	# the script. --deep is deprecated and fails on PyInstaller bundles.
-	while IFS= read -r -d '' f; do
-		codesign --force --verify --sign "${AS_CERT}" \
-			--entitlements "./dev/entitlements-appstore.plist" "${f}" || {
-			echo "App Store code-signing failed on: ${f}"
-			exit 1
-		}
-	done < <(find "${APP_AS}/Contents" \( -name "*.so" -o -name "*.dylib" \) -print0)
-
-	while IFS= read -r -d '' f; do
-		codesign --force --verify --sign "${AS_CERT}" \
-			--entitlements "./dev/entitlements-appstore.plist" "${f}" || {
-			echo "App Store code-signing failed on: ${f}"
-			exit 1
-		}
-	done < <(find "${APP_AS}/Contents/Frameworks" -maxdepth 1 -name "*.framework" -print0)
-
-	codesign --force --verify --verbose \
-		--sign "${AS_CERT}" \
+	# Deep-sign every binary inside the bundle with the App Store identity.
+	# --deep ensures nested frameworks/.dylibs are signed before the outer
+	# bundle, satisfying library-validation without the disable-library-
+	# validation entitlement that App Store review rejects.
+	codesign --deep --force --verify --verbose \
+		--sign "${AS_APP_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
 		"${APP_AS}" || {
 		echo "App Store code-signing failed."
@@ -127,7 +108,7 @@ if [[ -n "${AS_CERT}" ]]; then
 
 	productbuild \
 		--component "${APP_AS}" /Applications \
-		--sign "${AS_CERT}" \
+		--sign "${AS_INST_CERT}" \
 		"${PKG}" || {
 		echo "productbuild failed."
 		exit 1
@@ -136,6 +117,7 @@ if [[ -n "${AS_CERT}" ]]; then
 	rm -rf "${APP_AS}"
 	echo "App Store package created: ${PKG}"
 else
-	echo "No App Store signing certificate found; skipping pkg creation."
-	echo "  Missing: Apple Distribution"
+	echo "No App Store signing certificates found; skipping pkg creation."
+	[[ -z "${AS_APP_CERT}" ]] && echo "  Missing: 3rd Party Mac Developer Application"
+	[[ -z "${AS_INST_CERT}" ]] && echo "  Missing: 3rd Party Mac Developer Installer"
 fi
