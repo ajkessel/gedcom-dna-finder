@@ -3,6 +3,7 @@ if [[ "$STDBUF_ACTIVE" != "1" ]]; then
   export STDBUF_ACTIVE=1
   exec stdbuf -oL "$0" "$@"
 fi
+[[ "$1" == "-n" ]] && DRY=1
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."
 exec > >(sed 's/\x1b\[[0-9;]*m//g' | tee -a build-mac-appstore.log) 2>&1
@@ -50,6 +51,9 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
   #
 	# Ensure all files are readable by non-root users (App Store error 90255).
 	chmod -R a+rX "${APP_AS}"
+	# Ensure no files are quarantined
+  xattr -rd com.apple.quarantine "${APP_AS}"
+  [ -e "${APP_AS}/Contents/embedded.provisionprofile" ] && xattr -c "${APP_AS}/Contents/embedded.provisionprofile"
 
 	# Re-sign bottom-up with the App Store identity.
 	# --deep triggers errSecInternalComponent on Python .so extension modules,
@@ -98,7 +102,7 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 		exit 1
 	}
 
-	rm -rf "${APP_AS}"
+	[ "${DRY}" ] || rm -rf "${APP_AS}"
 	echo "App Store package created: ${PKG}"
 else
 	echo "No App Store signing certificates found; skipping pkg creation."
@@ -120,4 +124,4 @@ version=$(grep __version__ gedcom_dna_finder/__init__.py | grep -o '[0-9]\+\.[0-
 #xcrun altool --upload-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
 echo 'Uploading with the following command:'
 echo xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string 0.2.4 --bundle-version 0.2.4 --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
-xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string 0.2.4 --bundle-version 0.2.4 --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
+[ "${DRY}" ] || xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string 0.2.4 --bundle-version 0.2.4 --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
