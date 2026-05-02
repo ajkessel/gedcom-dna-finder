@@ -8,11 +8,11 @@ cd "${SCRIPT_DIR}/.."
 }
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
-  dev/build-linux.sh
+  dev/build-linux.sh "$@"
 elif [[ $(uname) == "Darwin" ]]; then
 	echo 'Building for macOS...'
-  dev/build-mac.sh
+  dev/build-mac.sh "$@"
 else
-  echo 'Platform not recognized. Exiting.'
+  echo 'Platform not recognized. Use build.ps1 for Windows. Exiting.'
   exit 1
 fi

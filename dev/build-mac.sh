@@ -1,10 +1,20 @@
 #!/bin/bash
-out="gedcom-dna-finder-mac.zip"
-echo 'Building for macOS...'
 if [[ "$OSTYPE" != "darwin"* ]]; then
 	echo 'This script is intended to be run on macOS.'
 	exit 1
 fi
+output_file="gedcom-dna-finder-mac.zip"
+while getopts "hnco:" opt; do
+  case $opt in
+    h) echo "Usage: $0 [-h] [-n] [-c] [-o]"; exit 0 ;;
+    n) DRY=true ;;
+    c) CLEAN=true ;;
+    o) output_file=$OPTARG ;;
+    *) echo "Invalid option"; exit 1 ;;
+  esac
+done
+echo 'Building for macOS...'
+[[ "$CLEAN" ]] && rm -r ./.venv "${HOME}/.pyenv"
 if [[ -e "${HOME}/.config/p" ]]; then
 	echo 'Unlocking keychain...'
 	security unlock-keychain -p "$(cat ${HOME}/.config/p)" "${HOME}/Library/Keychains/login.keychain-db"
@@ -15,15 +25,6 @@ fi
 export PATH="/usr/local/bin:$PATH"
 command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH" || {
 	echo 'homebrew not found, we will still try to build but this script has not been tested on MacOS without brew.'
-}
-
-# Install Tcl/Tk 9 via Homebrew if not present.  Tk < 8.6.13 references the
-# private AppKit symbol _NSWindowDidOrderOnScreenNotification, which causes
-# Mac App Store rejection (Guideline 2.5.1).  Homebrew's tcl-tk formula ships
-# Tk 9.x which is free of all known private-API references.
-command -v brew && {
-	brew list tcl-tk &>/dev/null || brew install tcl-tk
-	BREW_TCLK="$(brew --prefix tcl-tk)"
 }
 
 command -v pyenv || {
@@ -37,20 +38,11 @@ command -v pyenv || {
 } || {
 	export PYENV_ROOT="$HOME/.pyenv"
 	[[ -e "${PYENV_ROOT}/shims/python3.14" ]] || {
-		echo 'Installing pyenv for python 3.14.4 (linked against Homebrew Tcl/Tk to avoid private-API symbols)'
+		echo 'Installing pyenv for python 3.14'
 		mkdir -p "${PYENV_ROOT}"
 		eval "$(pyenv init -)"
-		# Point the Python build system at Homebrew's Tcl/Tk so the compiled
-		# _tkinter extension — and the Tk dylib PyInstaller bundles — come from
-		# a version that does not reference _NSWindowDidOrderOnScreenNotification.
-		if [[ -n "${BREW_TCLK}" ]]; then
-			export CPPFLAGS="-I${BREW_TCLK}/include ${CPPFLAGS:-}"
-			export LDFLAGS="-L${BREW_TCLK}/lib ${LDFLAGS:-}"
-			export PKG_CONFIG_PATH="${BREW_TCLK}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-		fi
-		export PYTHON_CONFIGURE_OPTS="--enable-universal-archs=universal2 --with-universal-archs=universal2"
-		pyenv install 3.14.4
-		pyenv global 3.14.4
+		pyenv install 3.14
+		pyenv global 3.14
 	}
 	eval "$(pyenv init -)"
 }
@@ -89,9 +81,10 @@ pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
 	echo 'Cannot find dist build folder.'
 	exit 1
 }
-ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${out}"
-xcrun notarytool submit "${out}" --keychain-profile "notarytool-profile" --wait
+[ "$DRY" ] && exit 0
+ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${output_file}"
+xcrun notarytool submit "${output_file}" --keychain-profile "notarytool-profile" --wait
 xcrun stapler staple ./dist/gedcom-dna-finder.app
-rm "${out}"
-ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${out}"
-mv "${out}" dist/
+rm "${output_file}"
+ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${output_file}"
+mv "${output_file}" dist/

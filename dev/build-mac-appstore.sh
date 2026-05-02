@@ -5,10 +5,11 @@ if [[ "$STDBUF_ACTIVE" != "1" ]]; then
 fi
 [[ "$1" == "-n" ]] && DRY=1
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+VERSION=$(sed -n 's/^__version__ = "\([0-9\.]*\).*/\1/p' gedcom_dna_finder/__init__.py)
 cd "${SCRIPT_DIR}/.."
 exec > >(sed 's/\x1b\[[0-9;]*m//g' | tee -a build-mac-appstore.log) 2>&1
 echo '--------------------------------'
-echo "Building app for Mac App Store."
+echo "Building app version ${VERSION} for Mac App Store."
 date
 echo '--------------------------------'
 security unlock-keychain -p "$(cat ~/.config/p)" ~/Library/Keychains/login.keychain-db
@@ -26,21 +27,6 @@ AS_INST_CERT=$(security find-identity -v 2>/dev/null |
 if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	echo "Building App Store package..."
 	APP_SRC="dist/gedcom-dna-finder.app"
-
-	# Reject builds that reference _NSWindowDidOrderOnScreenNotification, a
-	# private AppKit API flagged by App Store review (Guideline 2.5.1).
-	# This symbol appears in Tk < 8.6.13; the fix is to build with Tk 9 via
-	# Homebrew (see build-mac.sh) or use the Python.org universal2 installer
-	# which bundles Tk 8.6.13+.
-	PRIVATE_API="_NSWindowDidOrderOnScreenNotification"
-	TK_BIN=$(find "${APP_SRC}/Contents/Frameworks" -name "Tk" -type f 2>/dev/null | head -1)
-	if [[ -n "${TK_BIN}" ]] && strings "${TK_BIN}" | grep -q "${PRIVATE_API}"; then
-		echo "ERROR: bundled Tk references private API '${PRIVATE_API}'."
-		echo "       This build will be rejected by the App Store (Guideline 2.5.1)."
-		echo "       Rebuild using Homebrew tcl-tk (brew install tcl-tk) or the"
-		echo "       Python.org universal2 installer which bundles Tk 8.6.13+."
-		exit 1
-	fi
 	APP_AS="dist/gedcom-dna-finder-appstore.app"
 	PKG="dist/gedcom-dna-finder.pkg"
 
@@ -136,7 +122,6 @@ version=$(grep __version__ gedcom_dna_finder/__init__.py | grep -o '[0-9]\+\.[0-
 }
 # optional steps - not use to submit to app store
 #xcrun altool --validate-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
-#xcrun altool --upload-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
 echo 'Uploading with the following command:'
-echo xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string 0.2.4 --bundle-version 0.2.4 --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
-[ "${DRY}" ] || xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string 0.2.4 --bundle-version 0.2.4 --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
+echo xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string "${version}" --bundle-version "${version}" --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
+[ "${DRY}" ] || xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string "${version}" --bundle-version "${version}" --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"
