@@ -5,7 +5,7 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
 	echo 'This script is intended to be run on macOS.'
 	exit 1
 fi
-if [[ -e ${HOME}/.config/p ]]; then
+if [[ -e "${HOME}/.config/p" ]]; then
 	echo 'Unlocking keychain...'
 	security unlock-keychain -p "$(cat ${HOME}/.config/p)" "${HOME}/Library/Keychains/login.keychain-db"
 else
@@ -22,8 +22,8 @@ command -v brew && export PATH="$(brew --prefix python)/libexec/bin:$PATH" || {
 # Mac App Store rejection (Guideline 2.5.1).  Homebrew's tcl-tk formula ships
 # Tk 9.x which is free of all known private-API references.
 command -v brew && {
-  brew list tcl-tk &>/dev/null || brew install tcl-tk
-  BREW_TCLK="$(brew --prefix tcl-tk)"
+	brew list tcl-tk &>/dev/null || brew install tcl-tk
+	BREW_TCLK="$(brew --prefix tcl-tk)"
 }
 
 command -v pyenv || {
@@ -33,26 +33,26 @@ command -v pyenv || {
 # preference is for universal2 python from python.org
 # alternatively, set up pyenv environment
 [[ -e "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3" ]] && {
-  export PATH="/Library/Frameworks/Python.framework/Versions/3.14/bin/:${PATH}"
+	export PATH="/Library/Frameworks/Python.framework/Versions/3.14/bin/:${PATH}"
 } || {
-  export PYENV_ROOT="$HOME/.pyenv"
-  [[ -e "${PYENV_ROOT}/shims/python3.14" ]] || {
-    echo 'Installing pyenv for python 3.14.4 (linked against Homebrew Tcl/Tk to avoid private-API symbols)'
-    mkdir -p "${PYENV_ROOT}"
-    eval "$(pyenv init -)"
-    # Point the Python build system at Homebrew's Tcl/Tk so the compiled
-    # _tkinter extension — and the Tk dylib PyInstaller bundles — come from
-    # a version that does not reference _NSWindowDidOrderOnScreenNotification.
-    if [[ -n "${BREW_TCLK}" ]]; then
-      export CPPFLAGS="-I${BREW_TCLK}/include ${CPPFLAGS:-}"
-      export LDFLAGS="-L${BREW_TCLK}/lib ${LDFLAGS:-}"
-      export PKG_CONFIG_PATH="${BREW_TCLK}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-    fi
-    export PYTHON_CONFIGURE_OPTS="--enable-universal-archs=universal2 --with-universal-archs=universal2"
-    pyenv install 3.14.4
-    pyenv global 3.14.4
-  }
-  eval "$(pyenv init -)"
+	export PYENV_ROOT="$HOME/.pyenv"
+	[[ -e "${PYENV_ROOT}/shims/python3.14" ]] || {
+		echo 'Installing pyenv for python 3.14.4 (linked against Homebrew Tcl/Tk to avoid private-API symbols)'
+		mkdir -p "${PYENV_ROOT}"
+		eval "$(pyenv init -)"
+		# Point the Python build system at Homebrew's Tcl/Tk so the compiled
+		# _tkinter extension — and the Tk dylib PyInstaller bundles — come from
+		# a version that does not reference _NSWindowDidOrderOnScreenNotification.
+		if [[ -n "${BREW_TCLK}" ]]; then
+			export CPPFLAGS="-I${BREW_TCLK}/include ${CPPFLAGS:-}"
+			export LDFLAGS="-L${BREW_TCLK}/lib ${LDFLAGS:-}"
+			export PKG_CONFIG_PATH="${BREW_TCLK}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+		fi
+		export PYTHON_CONFIGURE_OPTS="--enable-universal-archs=universal2 --with-universal-archs=universal2"
+		pyenv install 3.14.4
+		pyenv global 3.14.4
+	}
+	eval "$(pyenv init -)"
 }
 ./dev/generate-icns.sh ./icons/family_tree.png || {
 	echo 'Failed to generate ICNS file.'
@@ -93,6 +93,5 @@ ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${out}"
 xcrun notarytool submit "${out}" --keychain-profile "notarytool-profile" --wait
 xcrun stapler staple ./dist/gedcom-dna-finder.app
 rm "${out}"
-ditto -c -k  --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${out}"
+ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${out}"
 mv "${out}" dist/
-
