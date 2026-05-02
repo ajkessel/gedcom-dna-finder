@@ -14,7 +14,14 @@ if [ "$1" == "-c" ]; then
 	gh release create
 fi
 current=$(gh release list --json tagName,isLatest --jq '.[] | select(.isLatest) | .tagName')
-git pull
+[ "$current" ] || {
+  echo 'Error finding current release number.'
+  exit 1
+}
+git pull || {
+  echo 'Error updating from git.'
+  exit 1
+}
 source .venv/bin/activate
 echo 'Building for Linux platform...'
 ./dev/build.sh
