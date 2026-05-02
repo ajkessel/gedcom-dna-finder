@@ -428,6 +428,7 @@ class DNAMatchFinderApp:
         self.status_text = tk.StringVar(value="No file loaded.")
 
         self.fuzzy_search = tk.BooleanVar(value=False)
+        self.show_ids = tk.BooleanVar(value=self._config.get_show_ids())
 
         self.search_text.trace_add('write', self._on_search_change)
         self.filter_text.trace_add('write', self._on_search_change)
@@ -941,7 +942,7 @@ class DNAMatchFinderApp:
                 if prefix:
                     text.insert('end', prefix)
                 tag = f'pers_{pid.strip("@")}'
-                text.insert('end', describe(self.individuals[pid]),
+                text.insert('end', describe(self.individuals[pid], show_id=self.show_ids.get()),
                             ('person_link', tag))
                 text.tag_configure(tag, foreground=self._link_color, underline=True)
                 text.tag_bind(tag, '<Button-1>',
@@ -1000,7 +1001,7 @@ class DNAMatchFinderApp:
 
             for level, xref, tag, value in indi.get('_raw', []):
                 parts = [str(level)]
-                if xref:
+                if xref and self.show_ids.get():
                     parts.append(xref)
                 parts.append(tag)
                 if value:
@@ -1034,7 +1035,7 @@ class DNAMatchFinderApp:
             if prefix:
                 w.insert('end', prefix, base)
             tag = f'pers_{indi_id.strip("@")}'
-            w.insert('end', describe(self.individuals[indi_id]),
+            w.insert('end', describe(self.individuals[indi_id], show_id=self.show_ids.get()),
                      base + ('person_link', tag))
             w.tag_configure(tag, foreground=self._link_color, underline=True)
             w.tag_bind(tag, '<Button-1>',
@@ -1048,7 +1049,7 @@ class DNAMatchFinderApp:
         if start['dna_markers']:
             nl("  Note: this person is themselves DNA-flagged.")
             for m in start['dna_markers']:
-                nl(f"    - {m}")
+                nl(f"    - {self._format_marker(m)}")
         nl()
 
         if not results:
@@ -1057,10 +1058,10 @@ class DNAMatchFinderApp:
             for rank, (dist, path) in enumerate(results, 1):
                 end_id = path[-1][0]
                 person(end_id, prefix=f"#{rank}: ",
-                       suffix=f"    (distance: {dist} edges)", bold=True)
+                       suffix=f" (distance: {dist} edges)", bold=True)
                 nl("   DNA markers:")
                 for m in self.individuals[end_id]['dna_markers']:
-                    nl(f"     - {m}")
+                    nl(f"     - {self._format_marker(m)}")
                 nl("   Path:")
                 for i, (node_id, edge) in enumerate(path):
                     if i == 0:
@@ -1170,6 +1171,12 @@ class DNAMatchFinderApp:
         self._last_result = None
         self._kb_focus_search()
 
+    def _format_marker(self, marker):
+        """Strip the trailing (@ref@) from a DNA marker string when Show IDs is off."""
+        if self.show_ids.get():
+            return marker
+        return re.sub(r'\s*\(@[^@]+@\)\s*$', '', marker)
+
     def _clear_person_tags(self, widget):
         for tag in widget.tag_names():
             if tag.startswith('pers_'):
@@ -1213,8 +1220,10 @@ class DNAMatchFinderApp:
         text = scrolledtext.ScrolledText(
             win, font=self._mono_font, wrap='none')
         text.pack(fill='both', expand=True)
-        lines = [f"{tid}\t{name}" for tid,
-                 name in sorted(self.tag_records.items())]
+        if self.show_ids.get():
+            lines = [f"{tid}\t{name}" for tid, name in sorted(self.tag_records.items())]
+        else:
+            lines = [name for _, name in sorted(self.tag_records.items())]
         text.insert('1.0', '\n'.join(lines))
         text.configure(state='disabled')
 
@@ -1374,7 +1383,7 @@ class DNAMatchFinderApp:
             if prefix:
                 w.insert('end', prefix)
             tag = f'pers_{indi_id.strip("@")}'
-            w.insert('end', describe(self.individuals[indi_id]),
+            w.insert('end', describe(self.individuals[indi_id], show_id=self.show_ids.get()),
                      ('person_link', tag))
             w.tag_configure(tag, foreground=self._link_color, underline=True)
             w.tag_bind(tag, '<Button-1>',
@@ -1677,6 +1686,12 @@ class DNAMatchFinderApp:
         ttk.Spinbox(search_frame, from_=1, to=200, textvariable=max_depth_var,
                     width=6).grid(row=0, column=3, sticky='w')
 
+        display_frame = ttk.LabelFrame(outer, text="Display", padding=(12, 6))
+        display_frame.pack(fill='x', pady=(0, 8))
+        show_ids_var = tk.BooleanVar(value=self.show_ids.get())
+        ttk.Checkbutton(display_frame, text="Show IDs (person and tag ID codes from GEDCOM)", variable=show_ids_var).pack(
+            side='left', padx=8)
+
         cache_frame = ttk.LabelFrame(outer, text="Cache", padding=(12, 6))
         cache_frame.pack(fill='x', pady=(0, 8))
         ttk.Button(cache_frame, text="Clear Cache…",
@@ -1701,6 +1716,9 @@ class DNAMatchFinderApp:
                 self._config.set_max_depth(self.max_depth.get())
             except (tk.TclError, ValueError):
                 pass
+            self.show_ids.set(show_ids_var.get())
+            self._config.set_show_ids(show_ids_var.get())
+            self._refresh_result()
             win.destroy()
 
         def on_cancel():

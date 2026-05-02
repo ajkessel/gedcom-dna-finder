@@ -188,7 +188,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
                             break
                 elif tag == 'PAGE' and page_marker_l and page_marker_l in value.lower():
                     indi['dna_markers'].append(
-                        f'Source citation PAGE: "{value.strip()}"'
+                        f'Source citation: "{value.strip()}"'
                     )
 
             individuals[head_xref] = indi
@@ -211,7 +211,7 @@ def build_model(gedcom_path, dna_keyword, page_marker):
             tag_name = tag_records.get(ref, '')
             if tag_name and dna_kw_l in tag_name.lower():
                 indi['dna_markers'].append(
-                    f'_MTTAG: {tag_name} ({ref})'
+                    f'Tag: {tag_name} ({ref})'
                 )
 
     return individuals, families, tag_records, encoding_warning
@@ -310,10 +310,12 @@ def lifespan(indi):
     return ''
 
 
-def describe(indi):
+def describe(indi, show_id=True):
     name = indi['name'] or '(unknown)'
     span = lifespan(indi)
-    return f'{name} ({span}) [{indi["id"]}]' if span else f'{name} [{indi["id"]}]'
+    if show_id:
+        return f'{name} ({span}) [{indi["id"]}]' if span else f'{name} [{indi["id"]}]'
+    return f'{name} ({span})' if span else name
 
 
 def _is_spouse_detour_of(longer, shorter):

@@ -95,6 +95,12 @@ class ConfigManager:
     def set_max_depth(self, value):
         self.save_value('max_depth', int(value))
 
+    def get_show_ids(self):
+        return bool(self.load_value('show_ids', False))
+
+    def set_show_ids(self, value):
+        self.save_value('show_ids', bool(value))
+
     # ------------------------------------------------------------------
     # Platform default path
     # ------------------------------------------------------------------

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.6] - 2026-05-01
+
+### Added
+
+- **"Show IDs" preference** — a new "Show IDs" checkbox in Preferences (under a new "Display" section) controls whether raw GEDCOM ID codes are shown anywhere in the application. Off by default. When disabled: person IDs (e.g. `[@I123@]`) are omitted from every name link in the results pane, family sections, and relationship path results; `xref` codes are hidden from raw GEDCOM records in the Show Person window; tag ID codes (e.g. `@MT1@`) are removed from the tag definitions viewer; and the `(@ref@)` suffix is stripped from DNA marker descriptions. Toggling the setting and clicking OK immediately re-renders the current result. The preference is persisted to `settings.json` and restored on next launch.
+
+### Fixed
+
+- **DNA marker labels** — the internal label prefix for source-citation markers was shortened from `Source citation PAGE:` to `Source citation:`, and the label for resolved `_MTTAG` pointer markers was renamed from `_MTTAG:` to `Tag:`, for cleaner display in the results pane.
+
 ## [0.2.5] - 2026-05-01
 
 ### Added
