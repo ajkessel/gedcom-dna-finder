@@ -11,7 +11,7 @@ echo '--------------------------------'
 echo "Building app for Mac App Store."
 date
 echo '--------------------------------'
-security unlock-keychain -p "`cat ~/.config/p`" ~/Library/Keychains/login.keychain-db
+security unlock-keychain -p "$(cat ~/.config/p)" ~/Library/Keychains/login.keychain-db
 if [[ ! -e 'dist/gedcom-dna-finder.app' ]]; then
   echo 'Built app not found, building now.'
   ./dev/build.sh
@@ -26,6 +26,21 @@ AS_INST_CERT=$(security find-identity -v 2>/dev/null |
 if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	echo "Building App Store package..."
 	APP_SRC="dist/gedcom-dna-finder.app"
+
+	# Reject builds that reference _NSWindowDidOrderOnScreenNotification, a
+	# private AppKit API flagged by App Store review (Guideline 2.5.1).
+	# This symbol appears in Tk < 8.6.13; the fix is to build with Tk 9 via
+	# Homebrew (see build-mac.sh) or use the Python.org universal2 installer
+	# which bundles Tk 8.6.13+.
+	PRIVATE_API="_NSWindowDidOrderOnScreenNotification"
+	TK_BIN=$(find "${APP_SRC}/Contents/Frameworks" -name "Tk" -type f 2>/dev/null | head -1)
+	if [[ -n "${TK_BIN}" ]] && strings "${TK_BIN}" | grep -q "${PRIVATE_API}"; then
+		echo "ERROR: bundled Tk references private API '${PRIVATE_API}'."
+		echo "       This build will be rejected by the App Store (Guideline 2.5.1)."
+		echo "       Rebuild using Homebrew tcl-tk (brew install tcl-tk) or the"
+		echo "       Python.org universal2 installer which bundles Tk 8.6.13+."
+		exit 1
+	fi
 	APP_AS="dist/gedcom-dna-finder-appstore.app"
 	PKG="dist/gedcom-dna-finder.pkg"
 

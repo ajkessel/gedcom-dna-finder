@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.7] - 2026-05-02
+
+### Fixed
+
+- **Mac App Store rejection (Guideline 2.5.1 — private API)** — the bundled Tk framework previously referenced `_NSWindowDidOrderOnScreenNotification`, a private AppKit API that causes App Store rejection. `build-mac.sh` now installs Homebrew's `tcl-tk` formula (Tk 9.x) before building, and when the pyenv Python path is taken it sets `CPPFLAGS`/`LDFLAGS`/`PKG_CONFIG_PATH` so that Python's `_tkinter` extension is compiled against Homebrew's Tk instead of the macOS system Tk 8.5.9 (which carries the offending symbol). `build-mac-appstore.sh` now runs a pre-submission check using `strings` against the bundled `Tk` binary and aborts with a clear error message if the private API symbol is found, preventing a non-compliant build from ever reaching Apple's review queue.
+
 ## [0.2.6] - 2026-05-01
 
 ### Added
