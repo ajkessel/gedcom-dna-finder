@@ -19,6 +19,7 @@ if ( -not ( Test-Path .\venv\scripts\activate.ps1)) {
     Write-Output "Virtual environment activation script not found. Please ensure the virtual environment is set up correctly." 
     exit 1
 }
+git pull
 & ".\venv\Scripts\activate.ps1"
 Remove-Item -Recurse -Force -Path dist\
 python .\dev\generate-icon.py .\icons\family_tree.png

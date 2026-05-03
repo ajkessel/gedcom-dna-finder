@@ -82,9 +82,21 @@ pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
 	exit 1
 }
 [ "$DRY" ] && exit 0
-ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${output_file}"
-xcrun notarytool submit "${output_file}" --keychain-profile "notarytool-profile" --wait
-xcrun stapler staple ./dist/gedcom-dna-finder.app
+ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${output_file}" || {
+	echo 'Cannot build zip file.'
+	exit 1
+}
+xcrun notarytool submit "${output_file}" --keychain-profile "notarytool-profile" --wait || {
+	echo 'Notarytool failed.'
+	exit 1
+}
+xcrun stapler staple ./dist/gedcom-dna-finder.app || {
+	echo 'Stapler failed.'
+	exit 1
+}
 rm "${output_file}"
-ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${output_file}"
+ditto -c -k --sequesterRsrc --keepParent "dist/gedcom-dna-finder.app" "${output_file}" || {
+	echo 'Cannot build notarized zip file.'
+	exit 1
+}
 mv "${output_file}" dist/

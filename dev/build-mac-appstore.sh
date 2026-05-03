@@ -1,13 +1,23 @@
 #!/bin/bash
+if [[ "$OSTYPE" != "darwin"* ]]; then
+	echo 'This script is intended to be run on macOS.'
+	exit 1
+fi
 if [[ "$STDBUF_ACTIVE" != "1" ]]; then
   export STDBUF_ACTIVE=1
   exec stdbuf -oL "$0" "$@"
 fi
-[[ "$1" == "-n" ]] && DRY=1
+while getopts "hn:" opt; do
+  case $opt in
+    h) echo "Usage: $0 [-h] [-n]"; exit 0 ;;
+    n) DRY=true ;;
+    *) echo "Invalid option"; exit 1 ;;
+  esac
+done
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-VERSION=$(sed -n 's/^__version__ = "\([0-9\.]*\).*/\1/p' gedcom_dna_finder/__init__.py)
 cd "${SCRIPT_DIR}/.."
 exec > >(sed 's/\x1b\[[0-9;]*m//g' | tee -a build-mac-appstore.log) 2>&1
+VERSION=$(sed -n 's/^__version__ = "\([0-9\.]*\).*/\1/p' gedcom_dna_finder/__init__.py)
 echo '--------------------------------'
 echo "Building app version ${VERSION} for Mac App Store."
 date

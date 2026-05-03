@@ -1,10 +1,19 @@
 #!/bin/bash
-out="gedcom-dna-finder-linux.zip"
 if [[ "$OSTYPE" != "linux-gnu"* ]]; then
 	echo 'This script is intended to be run on Linux.'
 	exit 1
 fi
-[[ -e .venv/bin/activate ]] || {
+output_file="gedcom-dna-finder-linux.zip"
+while getopts "hnco:" opt; do
+  case $opt in
+    h) echo "Usage: $0 [-h] [-c] [-o]"; exit 0 ;;
+    c) CLEAN=true ;;
+    o) output_file=$OPTARG ;;
+    *) echo "Invalid option"; exit 1 ;;
+  esac
+done
+[[ "$CLEAN" ]] && [[ -e ".venv" ]] && rm -r ".venv"
+[[ -e ".venv/bin/activate" ]] || {
 	echo 'Creating virtual environment...'
 	python3 -m venv .venv --prompt "gedcom-dna-finder" || {
 		echo 'Failed to create virtual environment.'
@@ -36,6 +45,6 @@ pyinstaller --noconfirm ./dev/gedcom-dna-finder-gui.spec || {
 	exit 1
 }
 pushd dist
-zip -r "../${out}" .
-mv "../${out}" .
+zip -r "../${output_file}" .
+mv "../${output_file}" .
 popd
