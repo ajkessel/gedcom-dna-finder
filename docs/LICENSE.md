@@ -1,5 +1,7 @@
 ## Copyright (c) 2026, Adam J. Kessel
 
+This is open source software. Source code and feedback available at [gedcom-dna-finder](https://github.com/ajkessel/gedcom-dna-finder/).
+
 ## BSD 2-Clause License
 
 Redistribution and use in source and binary forms, with or without

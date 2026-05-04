@@ -1,7 +1,7 @@
 #!/bin/bash
 if [[ "$STDBUF_ACTIVE" != "1" ]]; then
-  export STDBUF_ACTIVE=1
-  exec stdbuf -oL "$0" "$@"
+	export STDBUF_ACTIVE=1
+	exec stdbuf -oL "$0" "$@"
 fi
 [[ "$1" == "-n" ]] && DRY=1
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -14,8 +14,8 @@ date
 echo '--------------------------------'
 security unlock-keychain -p "$(cat ~/.config/p)" ~/Library/Keychains/login.keychain-db
 if [[ ! -e 'dist/gedcom-dna-finder.app' ]]; then
-  echo 'Built app not found, building now.'
-  ./dev/build.sh
+	echo 'Built app not found, building now.'
+	./dev/build.sh
 fi
 AS_APP_CERT=$(security find-identity -v -p codesigning 2>/dev/null |
 	grep "3rd Party Mac Developer Application" |
@@ -35,7 +35,7 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 	cp -R "${APP_SRC}" "${APP_AS}"
 
 	# Embed provisioning profile (required for TestFlight eligibility).
-  PROVISION_PROFILE="${HOME}/Library/MobileDevice/Provisioning Profiles/gedcom-dna-finder.provisionprofile"
+	PROVISION_PROFILE="${HOME}/Library/MobileDevice/Provisioning Profiles/gedcom-dna-finder.provisionprofile"
 	if [[ ! -f "${PROVISION_PROFILE}" ]]; then
 		PROVISION_PROFILE="$(dirname "$0")/gedcom-dna-finder.provisionprofile"
 	fi
@@ -49,12 +49,12 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 		echo "WARNING: No provisioning profile found; app will not be TestFlight-eligible."
 		echo "  Place gedcom-dna-finder.provisionprofile in ~/Library/MobileDevice/Provisioning Profiles/ or dev/"
 	fi
-  #
+	#
 	# Ensure all files are readable by non-root users (App Store error 90255).
 	chmod -R a+rX "${APP_AS}"
 	# Ensure no files are quarantined
-  xattr -rd com.apple.quarantine "${APP_AS}"
-  [ -e "${APP_AS}/Contents/embedded.provisionprofile" ] && xattr -c "${APP_AS}/Contents/embedded.provisionprofile"
+	xattr -rd com.apple.quarantine "${APP_AS}"
+	[ -e "${APP_AS}/Contents/embedded.provisionprofile" ] && xattr -c "${APP_AS}/Contents/embedded.provisionprofile"
 
 	# Re-sign bottom-up with the App Store identity.
 	# --deep triggers errSecInternalComponent on Python .so extension modules,
@@ -67,9 +67,9 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 		}
 	done < <(find "${APP_AS}" -type f \( -name "*.so" -o -name "*.dylib" -o -name 'Python' \) -print0)
 
-  find "${APP_AS}" -type f -perm +111 -exec codesign --force --options runtime --sign "${AS_APP_CERT}" {} \;
+	find "${APP_AS}" -type f -perm +111 -exec codesign --force --options runtime --sign "${AS_APP_CERT}" {} \;
 
-  echo "Signing provisioning profile."
+	echo "Signing provisioning profile."
 	codesign --force --verbose \
 		--sign "${AS_APP_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
@@ -78,7 +78,7 @@ if [[ -n "${AS_APP_CERT}" && -n "${AS_INST_CERT}" ]]; then
 		exit 1
 	}
 
-  echo "Signing entitlements."
+	echo "Signing entitlements."
 	codesign --force --verbose \
 		--sign "${AS_APP_CERT}" \
 		--entitlements "./dev/entitlements-appstore.plist" \
@@ -109,7 +109,7 @@ else
 	echo "No App Store signing certificates found; skipping pkg creation."
 	[[ -z "${AS_APP_CERT}" ]] && echo "  Missing: 3rd Party Mac Developer Application"
 	[[ -z "${AS_INST_CERT}" ]] && echo "  Missing: 3rd Party Mac Developer Installer"
-  exit 1
+	exit 1
 fi
 echo "Submitting App Store package to app store..."
 apiKey=$(cat "${HOME}/.appstoreconnect/apikey.txt")
@@ -117,10 +117,10 @@ apiIssuer=$(cat "${HOME}/.appstoreconnect/apiissuer.txt")
 appid=$(cat "${HOME}/.appstoreconnect/appid.txt")
 version=$(grep __version__ gedcom_dna_finder/__init__.py | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
 [ -z "${apiKey}" ] || [ -z "${apiIssuer}" ] || [ -z "${version}" ] || [ -z "${appid}" ] && {
-  echo "Need apiKey, apiIssuer, version, and appid to be set for app store upload."
-  exit 1
+	echo "Need apiKey, apiIssuer, version, and appid to be set for app store upload."
+	exit 1
 }
-# optional steps - not use to submit to app store
+# optional steps - not use to submit to app store, just validate pkg
 #xcrun altool --validate-app -f dist/gedcom-dna-finder.pkg -t macos --apiKey "${apiKey}" --apiIssuer "${apiIssuer}"
 echo 'Uploading with the following command:'
 echo xcrun altool --upload-package dist/gedcom-dna-finder.pkg --type osx --bundle-id "com.ajkessel.gedcom-dna-finder" --bundle-short-version-string "${version}" --bundle-version "${version}" --apiKey "${apiKey}" --apiIssuer "${apiIssuer}" --apple-id "${appid}"

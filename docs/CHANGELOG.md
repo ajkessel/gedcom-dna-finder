@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.9] - 2026-05-04
+
+### Added
+
+- **Clickable hyperlinks in markdown viewer** — links in the Help, Keyboard Shortcuts, License, and Privacy Policy windows are now active. Clicking a `[text](url)` link opens it in the system's default web browser. Previously the link text was styled in the link color but had no click behavior.
+
+### Changed
+
+- **License page** — added a link to the GitHub source repository.
+- **Build process** — various changes to build process to get code in shape for App Store submission
+
 ## [0.2.8] - 2026-05-02
 
 - Minor bump

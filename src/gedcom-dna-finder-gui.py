@@ -27,6 +27,7 @@ import difflib
 import os
 import re
 import sys
+import webbrowser
 from collections import deque
 
 def _read_version():
@@ -63,10 +64,10 @@ import tkinter.font as tkfont
 # Inline markdown: image (skip), link, bold, italic, code
 _INLINE_RE = re.compile(
     r'!\[[^\]]*\]\([^)]*\)'      # image – discard, no capture groups
-    r'|\[([^\]]+)\]\([^)]+\)'    # link: g1 = display text
-    r'|\*\*(.+?)\*\*'            # bold: g2
-    r'|\*(.+?)\*'                # italic: g3
-    r'|`(.+?)`'                  # inline code: g4
+    r'|\[([^\]]+)\]\(([^)]+)\)'  # link: g1 = display text, g2 = URL
+    r'|\*\*(.+?)\*\*'            # bold: g3
+    r'|\*(.+?)\*'                # italic: g4
+    r'|`(.+?)`'                  # inline code: g5
 )
 
 
@@ -1876,7 +1877,7 @@ class DNAMatchFinderApp:
     def _show_about(self):
         self._show_file_window(
             "About",
-            self._resource_path('docs/LICENSE.md'), markdown=True,
+            self._resource_path('docs/LICENSE.md'), markdown=True, 
             preamble=f"# GEDCOM DNA Match Finder  v{__version__} ({__release_date__})\n\n",
         )
 
@@ -2037,15 +2038,23 @@ class DNAMatchFinderApp:
         for m in _INLINE_RE.finditer(text):
             if m.start() > pos:
                 widget.insert('end', text[pos:m.start()], base_tag)
-            g1, g2, g3, g4 = m.group(1), m.group(2), m.group(3), m.group(4)
+            g1, g2, g3, g4, g5 = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
             if g1 is not None:
-                widget.insert('end', g1, (base_tag, 'link'))
-            elif g2 is not None:
-                widget.insert('end', g2, (base_tag, 'bold'))
+                url = g2
+                lc = getattr(widget, '_link_count', 0)
+                widget._link_count = lc + 1
+                tag = f'_url_{lc}'
+                widget.tag_configure(tag, foreground=self._link_color, underline=True)
+                widget.tag_bind(tag, '<Button-1>', lambda _, u=url: webbrowser.open(u))
+                widget.tag_bind(tag, '<Enter>', lambda _: widget.config(cursor='hand2'))
+                widget.tag_bind(tag, '<Leave>', lambda _: widget.config(cursor=''))
+                widget.insert('end', g1, (base_tag, tag))
             elif g3 is not None:
-                widget.insert('end', g3, (base_tag, 'italic'))
+                widget.insert('end', g3, (base_tag, 'bold'))
             elif g4 is not None:
-                widget.insert('end', g4, 'code_inline')
+                widget.insert('end', g4, (base_tag, 'italic'))
+            elif g5 is not None:
+                widget.insert('end', g5, 'code_inline')
             # else: image – discard silently
             pos = m.end()
         if pos < len(text):
