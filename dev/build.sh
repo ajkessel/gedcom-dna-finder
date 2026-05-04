@@ -6,6 +6,7 @@ cd "${SCRIPT_DIR}/.."
 	echo 'Build files not found.'
 	exit 1
 }
+git pull
 if [[ $(uname) == "Linux" ]]; then
 	echo 'Building for Linux...'
   dev/build-linux.sh "$@"

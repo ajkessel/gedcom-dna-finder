@@ -1,6 +1,6 @@
 #!/bin/bash
 # script for building and uploading executables to Github
-# intended to run from WSL instance with access to local powershell and remote mac at hostname vmac
+# intended to run from WSL instance with access to local powershell and mac accessible via ssh with source code installed at hostname 'mac'
 # include -c as command line switch to create new release, otherwise latest release will be used
 if [[ "$STDBUF_ACTIVE" != "1" ]]; then
   export STDBUF_ACTIVE=1
@@ -26,9 +26,9 @@ source .venv/bin/activate
 echo 'Building for Linux platform...'
 ./dev/build.sh
 echo 'Building for Windows platform...'
-pwsh -command 'set-location c:/apps/src/gedcom-dna-finder ; git pull ; ./dev/build.ps1'
+pwsh -command 'set-location c:/apps/src/gedcom-dna-finder ; ./dev/build.ps1'
 echo 'Building for Mac platform...'
-ssh mac 'cd src/gedcom-dna-finder/ ; git pull ; ./dev/build.sh'
+ssh mac 'cd src/gedcom-dna-finder/ ; ./dev/build.sh'
 echo 'Copying built ZIP files locally...'
 scp mac:src/gedcom-dna-finder/dist/*zip ./dist
 cp /mnt/c/apps/src/gedcom-dna-finder/dist/*zip ./dist
