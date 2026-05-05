@@ -7,7 +7,7 @@ like Ancestry, MyHeritage, Geni, and Family Tree Maker:
 * Show multiple relationship paths between any two people in your tree
 * Search your tree for variations on names and filter on other information like
   geographical locations
-* Rapidly explore names and connections, even in a vrey large tree
+* Rapidly explore names and connections, even in a very large tree
 
 Available as a graphical tool as well as a command-line version.
 

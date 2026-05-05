@@ -49,6 +49,7 @@ sdist
 selectbackground
 selectforeground
 selectmode
+Smth
 subrecord
 takefocus
 tearoff
