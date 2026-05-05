@@ -2439,18 +2439,12 @@ class DNAMatchFinderApp:
         else:
             text.insert('1.0', content)
 
-        text.configure(state='disabled')
         if sys.platform == 'darwin':
-            # On macOS, tag_bind <Button-1> is swallowed by disabled Text widgets;
-            # a widget-level handler dispatches URL opens instead.
-            url_tags = getattr(text, '_url_tags', {})
-            def _macos_link_click(event, _tags=url_tags):
-                idx = event.widget.index(f'@{event.x},{event.y}')
-                for t in event.widget.tag_names(idx):
-                    if t in _tags:
-                        webbrowser.open(_tags[t])
-                        break
-            text.bind('<Button-1>', _macos_link_click)
+            # On macOS Aqua, state='disabled' blocks all mouse events including
+            # tag_bind clicks, so keep the widget editable and block key input instead.
+            text.bind('<Key>', lambda e: 'break')
+        else:
+            text.configure(state='disabled')
         ttk.Separator(win, orient='horizontal').pack(fill='x')
         btn_frame = ttk.Frame(win)
         btn_frame.pack(fill='x', padx=12, pady=8)
