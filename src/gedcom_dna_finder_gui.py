@@ -2180,7 +2180,7 @@ class DNAMatchFinderApp:
         self.root.update_idletasks()
         x = self.root.winfo_rootx()
         y = self.root.winfo_rooty()
-        self._app_menu.post(x, y)
+        self._app_menu.tk_popup(x, y)
 
     def _kb_focus_search(self):
         """Focus and select the main search field."""
