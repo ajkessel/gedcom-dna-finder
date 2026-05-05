@@ -38,10 +38,21 @@ import argparse
 import difflib
 import os
 import re
+import subprocess
 import sys
 import threading
 import webbrowser
 from collections import deque
+
+
+def _open_url(url):
+    # webbrowser.open() silently fails in PyInstaller .app bundles on macOS
+    # because Python routes through osascript, which can break in frozen apps.
+    # /usr/bin/open is always available and handles URLs reliably.
+    if sys.platform == 'darwin':
+        subprocess.run(['/usr/bin/open', url], check=False)
+    else:
+        webbrowser.open(url)
 
 
 class Tooltip:
@@ -2626,7 +2637,7 @@ class DNAMatchFinderApp:
                 widget.tag_configure(
                     tag, foreground=self._link_color, underline=True)
                 widget.tag_bind(tag, '<Button-1>', lambda _,
-                                u=url: webbrowser.open(u))
+                                u=url: _open_url(u))
                 widget.tag_bind(
                     tag, '<Enter>', lambda _: widget.config(cursor='hand2'))
                 widget.tag_bind(
