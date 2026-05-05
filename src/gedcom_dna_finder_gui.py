@@ -2378,6 +2378,7 @@ class DNAMatchFinderApp:
         info = base.actual()
         family = info['family']
         size = abs(info['size']) or 10
+        mono = 'Menlo' if sys.platform == 'darwin' else 'Courier'
 
         widget.tag_configure('h1', font=(
             family, size + 7, 'bold'), spacing1=10, spacing3=5)
@@ -2388,14 +2389,14 @@ class DNAMatchFinderApp:
         widget.tag_configure('bold', font=(family, size, 'bold'))
         widget.tag_configure('italic', font=(family, size, 'italic'))
         widget.tag_configure('code_inline', font=(
-            'Courier', size - 1), background='#f0f0f0')
-        widget.tag_configure('code_block', font=('Courier', size - 1), background='#f0f0f0',
+            mono, size - 1), background='#f0f0f0')
+        widget.tag_configure('code_block', font=(mono, size - 1), background='#f0f0f0',
                              lmargin1=16, lmargin2=16, spacing1=1, spacing3=1)
         widget.tag_configure('link', foreground=self._link_color)
         widget.tag_configure('bullet', lmargin1=16, lmargin2=32)
         widget.tag_configure('normal', font=(family, size))
-        widget.tag_configure('table_cell', font=('Courier', size - 1))
-        widget.tag_configure('table_bold', font=('Courier', size - 1, 'bold'))
+        widget.tag_configure('table_cell', font=(mono, size - 1))
+        widget.tag_configure('table_bold', font=(mono, size - 1, 'bold'))
 
         lines = content.split('\n')
 
