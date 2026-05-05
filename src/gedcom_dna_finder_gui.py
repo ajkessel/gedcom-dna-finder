@@ -2199,7 +2199,8 @@ class DNAMatchFinderApp:
             geo = win.geometry()
             self._show_person_geometry = geo
             self._config.set_window_geometry('show_person_geometry', geo)
-        except Exception:
+        except Exception as e: # pylint: disable=broad-except
+            print(f"Error persisting show person geometry: {e}")
             pass
 
     def _set_home_person(self):
