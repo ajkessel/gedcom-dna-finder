@@ -39,6 +39,7 @@ import difflib
 import os
 import re
 import sys
+import threading
 import webbrowser
 from collections import deque
 
@@ -519,6 +520,7 @@ class DNAMatchFinderApp:
         self._dna_settings_after_id = None
         # {'type': 'dna_matches'|'path', 'start_id': ..., 'end_id': ...}
         self._last_result = None
+        self._busy = False
         self._sort_col = 'name'
         self._sort_rev = False
 
@@ -580,10 +582,12 @@ class DNAMatchFinderApp:
         self.path_combo.pack(side='left', fill='x', expand=True, padx=(0, 4))
         self.path_combo.bind('<<ComboboxSelected>>',
                              lambda _: self._load_file())
-        ttk.Button(file_frame, text=BTN_BROWSE,
-                   command=self._browse).pack(side='left', padx=2)
-        ttk.Button(file_frame, text=BTN_LOAD, command=self._load_file).pack(
-            side='left', padx=2)
+        self.browse_btn = ttk.Button(file_frame, text=BTN_BROWSE,
+                                     command=self._browse)
+        self.browse_btn.pack(side='left', padx=2)
+        self.load_btn = ttk.Button(file_frame, text=BTN_LOAD,
+                                   command=self._load_file)
+        self.load_btn.pack(side='left', padx=2)
 
         # Settings row
         settings_frame = ttk.LabelFrame(
@@ -730,11 +734,39 @@ class DNAMatchFinderApp:
         self.results.configure(state='disabled')
 
         # Status bar
-        status = ttk.Label(outer, textvariable=self.status_text,
-                           relief='sunken', anchor='w')
-        status.pack(fill='x', pady=(8, 0))
+        status_bar = ttk.Frame(outer, relief='sunken')
+        status_bar.pack(fill='x', pady=(8, 0))
+        status_bar.columnconfigure(0, weight=1)
+        ttk.Label(status_bar, textvariable=self.status_text, anchor='w').grid(
+            row=0, column=0, sticky='ew', padx=(4, 0), pady=1)
+        self._progress_bar = ttk.Progressbar(
+            status_bar, mode='indeterminate', length=130)
+        self._progress_bar.grid(row=0, column=1, padx=(4, 2), pady=2)
+        self._progress_bar.grid_remove()  # hidden until a long operation starts
 
         self._setup_keybindings()
+
+    # ---------------------------------------------------------- Busy / progress
+    def _show_progress(self, msg=None):
+        """Reveal the indeterminate progress bar and optionally set status text."""
+        if msg:
+            self.status_text.set(msg)
+        self._progress_bar.grid()
+        self._progress_bar.start(12)
+        self.root.update_idletasks()
+
+    def _hide_progress(self):
+        """Stop and hide the progress bar."""
+        self._progress_bar.stop()
+        self._progress_bar.grid_remove()
+
+    def _set_busy(self, busy):
+        """Disable or re-enable the controls that trigger long operations."""
+        self._busy = busy
+        state = 'disabled' if busy else 'normal'
+        for widget in (self.load_btn, self.browse_btn,
+                       self.path_combo, self.find_matches_btn):
+            widget.configure(state=state)
 
     # ---------------------------------------------------------- Handlers
     def _browse(self):
@@ -753,6 +785,8 @@ class DNAMatchFinderApp:
 
     def _load_file(self):
         """Load the selected GEDCOM file into the model and refresh the UI."""
+        if self._busy:
+            return
         path = self.gedcom_path.get().strip()
         if not path:
             messagebox.showerror(ERR_NO_FILE_TITLE, ERR_NO_FILE_MSG)
@@ -775,48 +809,57 @@ class DNAMatchFinderApp:
                     ERR_ZIP_TITLE, ERR_ZIP_MSG.format(error=e))
                 return
 
-        self.status_text.set(STATUS_LOADING)
-        self.root.config(cursor="watch")
-        self.root.update_idletasks()
-        try:
-            from_cache, encoding_warning = self._model.load(
-                gedcom_path,
-                dna_keyword=self.tag_keyword.get(),
-                page_marker=self.page_marker.get(),
-                cache_dir=self._cache_dir(),
-            )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            self.root.config(cursor="")
-            self.status_text.set(STATUS_LOAD_FAILED)
-            messagebox.showerror(
-                ERR_PARSE_TITLE, ERR_PARSE_MSG.format(error=e))
-            return
-        finally:
+        self._show_progress(STATUS_LOADING)
+        self._set_busy(True)
+
+        dna_keyword = self.tag_keyword.get()
+        page_marker = self.page_marker.get()
+        cache_dir = self._cache_dir()
+
+        def _do_load():
+            try:
+                result = self._model.load(
+                    gedcom_path,
+                    dna_keyword=dna_keyword,
+                    page_marker=page_marker,
+                    cache_dir=cache_dir,
+                )
+                self.root.after(0, lambda: _on_done(result, None))
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                self.root.after(0, lambda: _on_done(None, e))
+
+        def _on_done(result, error):
             if tmp_path:
                 try:
                     os.unlink(tmp_path)
                 except OSError:
                     pass
+            self._hide_progress()
+            self._set_busy(False)
+            if error:
+                self.status_text.set(STATUS_LOAD_FAILED)
+                messagebox.showerror(
+                    ERR_PARSE_TITLE, ERR_PARSE_MSG.format(error=error))
+                return
+            from_cache, encoding_warning = result
+            self.individuals = self._model.individuals
+            self.families = self._model.families
+            self.tag_records = self._model.tag_records
+            if encoding_warning:
+                messagebox.showwarning(ERR_ENCODING_TITLE, encoding_warning)
+            self.sorted_ids = sorted(
+                self.individuals.keys(),
+                key=lambda iid: (self.individuals[iid]['name'].lower(), iid),
+            )
+            self._add_to_history(path)
+            self._home_person_id = self._load_home_person(path)
+            self._populate_tree()
+            status = (STATUS_LOADED_CACHED.format(count=len(self.individuals))
+                      if from_cache
+                      else STATUS_LOADED.format(count=len(self.individuals)))
+            self.status_text.set(status)
 
-        self.individuals = self._model.individuals
-        self.families = self._model.families
-        self.tag_records = self._model.tag_records
-
-        if encoding_warning:
-            messagebox.showwarning(ERR_ENCODING_TITLE, encoding_warning)
-
-        self.sorted_ids = sorted(
-            self.individuals.keys(),
-            key=lambda iid: (self.individuals[iid]['name'].lower(), iid),
-        )
-        self.root.config(cursor="")
-        self._add_to_history(path)
-        self._home_person_id = self._load_home_person(path)
-        self._populate_tree()
-        status = (STATUS_LOADED_CACHED.format(count=len(self.individuals))
-                  if from_cache
-                  else STATUS_LOADED.format(count=len(self.individuals)))
-        self.status_text.set(status)
+        threading.Thread(target=_do_load, daemon=True).start()
 
     def _on_settings_change(self, *_):
         """Debounce search depth and result count changes before rerendering."""
@@ -1009,6 +1052,8 @@ class DNAMatchFinderApp:
 
     def _find_matches(self):
         """Find and display nearest DNA-flagged matches for the selected person."""
+        if self._busy:
+            return
         if not self.individuals:
             messagebox.showwarning(ERR_NO_DATA_TITLE, ERR_NO_DATA_MSG)
             return
@@ -1023,9 +1068,27 @@ class DNAMatchFinderApp:
         except (tk.TclError, ValueError):
             messagebox.showerror(ERR_BAD_VAL_TITLE, ERR_BAD_VAL_TOP_N)
             return
-        results = self._model.find_dna_matches(start_id, top_n, max_depth)
-        self._last_result = {'type': 'dna_matches', 'start_id': start_id}
-        self._render_results(start_id, results)
+
+        self._show_progress()
+        self._set_busy(True)
+
+        def _do_search():
+            try:
+                results = self._model.find_dna_matches(start_id, top_n, max_depth)
+                self.root.after(0, lambda: _on_done(results, None))
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                self.root.after(0, lambda: _on_done(None, e))
+
+        def _on_done(results, error):
+            self._hide_progress()
+            self._set_busy(False)
+            if error:
+                messagebox.showerror(ERR_PARSE_TITLE, str(error))
+                return
+            self._last_result = {'type': 'dna_matches', 'start_id': start_id}
+            self._render_results(start_id, results)
+
+        threading.Thread(target=_do_search, daemon=True).start()
 
     def _show_person(self):
         """Open the GEDCOM record viewer for the selected person."""
@@ -1627,6 +1690,8 @@ class DNAMatchFinderApp:
 
     def _find_path(self):
         """Prompt for a target person and render paths from the current selection."""
+        if self._busy:
+            return
         sel = self.tree.selection()
         if not sel:
             messagebox.showwarning(ERR_NO_SEL_TITLE, ERR_NO_PATH_SEL_MSG)
@@ -1647,11 +1712,29 @@ class DNAMatchFinderApp:
             top_n = int(self.top_n.get())
         except (tk.TclError, ValueError):
             top_n = 5
-        paths, truncated = self._model.find_all_paths(
-            start_id, target_id, top_n, max_depth)
-        self._last_result = {'type': 'path',
-                             'start_id': start_id, 'end_id': target_id}
-        self._render_path_results(start_id, target_id, paths, truncated)
+
+        self._show_progress()
+        self._set_busy(True)
+
+        def _do_search():
+            try:
+                paths, truncated = self._model.find_all_paths(
+                    start_id, target_id, top_n, max_depth)
+                self.root.after(0, lambda: _on_done(paths, truncated, None))
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                self.root.after(0, lambda: _on_done(None, None, e))
+
+        def _on_done(paths, truncated, error):
+            self._hide_progress()
+            self._set_busy(False)
+            if error:
+                messagebox.showerror(ERR_PARSE_TITLE, str(error))
+                return
+            self._last_result = {'type': 'path',
+                                 'start_id': start_id, 'end_id': target_id}
+            self._render_path_results(start_id, target_id, paths, truncated)
+
+        threading.Thread(target=_do_search, daemon=True).start()
 
     def _render_path_results(self, start_id, end_id, paths, truncated=False):
         """Render relationship paths between two selected individuals."""
