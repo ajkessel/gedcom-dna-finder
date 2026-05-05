@@ -2341,8 +2341,15 @@ class DNAMatchFinderApp:
         py = self.root.winfo_y() + (self.root.winfo_height() - dh) // 2
         win.geometry(f"{dw}x{dh}+{px}+{py}")
 
-        text = scrolledtext.ScrolledText(win, wrap='word', padx=12, pady=8)
-        text.pack(fill='both', expand=True)
+        text_frame = ttk.Frame(win)
+        text_frame.pack(fill='both', expand=True)
+        vsb = ttk.Scrollbar(text_frame, orient='vertical')
+        text = tk.Text(text_frame, wrap='word', padx=12, pady=8,
+                       relief='flat', borderwidth=0,
+                       yscrollcommand=vsb.set)
+        vsb.configure(command=text.yview)
+        vsb.pack(side='right', fill='y')
+        text.pack(side='left', fill='both', expand=True)
 
         if markdown:
             self._render_markdown(text, content)
@@ -2350,7 +2357,10 @@ class DNAMatchFinderApp:
             text.insert('1.0', content)
 
         text.configure(state='disabled')
-        ttk.Button(win, text=BTN_CLOSE, command=win.destroy).pack(pady=(4, 8))
+        ttk.Separator(win, orient='horizontal').pack(fill='x')
+        btn_frame = ttk.Frame(win)
+        btn_frame.pack(fill='x', padx=12, pady=8)
+        ttk.Button(btn_frame, text=BTN_CLOSE, command=win.destroy).pack(side='right')
 
         win.bind('<Up>', lambda _: text.yview_scroll(-1, 'units') or 'break')
         win.bind('<Down>', lambda _: text.yview_scroll(1, 'units') or 'break')
@@ -2360,7 +2370,7 @@ class DNAMatchFinderApp:
         win.bind('<End>', lambda _: text.yview_moveto(1) or 'break')
 
         win.lift()
-        win.focus_force()
+        win.focus_set()
 
     def _render_markdown(self, widget, content):
         """Render basic markdown into a tkinter Text widget using tag formatting."""

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.3.1] - 2026-05-05
+
+- Various fixes to improve "look" on MacOS
+
 ## [0.3.0] - 2026-05-05
 
 ### Added
