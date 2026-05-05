@@ -7,7 +7,7 @@ like Ancestry, MyHeritage, Geni, and Family Tree Maker:
 * Show multiple relationship paths between any two people in your tree
 * Search your tree for variations on names and filter on other information like
   geographical locations
-* Rapidly explore names and connections in your tree
+* Rapidly explore names and connections, even in a vrey large tree
 
 Available as a graphical tool as well as a command-line version.
 
@@ -28,8 +28,8 @@ interested in experimenting with a "dummy" GEDCOM file rather than your own,
 several are available from [https://github.com/findmypast/gedcom-samples](the
 findmypast GitHub repository). I used the [Game of Thrones family
 tree](https://github.com/findmypast/gedcom-samples/blob/main/GoT.ged) for the
-sample screenshots to avoid any privacy issues and also to show why it's a bad
-idea for siblings to marry one another.
+sample screenshots to avoid any privacy issues and also to show why it gets
+complicated when siblings marry one another.
 
 ## The problems this solves
 
@@ -58,10 +58,10 @@ in addition to the closest people with DNA match markers.
 Finally, if you have a large tree, you may find it difficult to search for
 specific individuals in other tools. Ancestry, for example, only searches on the
 person's "preferred name" and not any of the alternate names, and neither
-Ancestry nor Family Tree Maker allow fuzzy matching searches. Ancestry also
-does not allow you to easily search on multiple fields, like name and location.
-With this tool, you can search for a name with fuzzy matching (e.g. "John Smith"
-in the "Find:" box) and then further limit the results by a term that appears
+Ancestry nor Family Tree Maker allow fuzzy matching searches. Ancestry also does
+not allow you to easily search on multiple fields, like name and location. With
+this tool, you can search for a name with fuzzy matching (e.g. "John Smith" in
+the "Find:" box) and then further limit the results by a term that appears
 anywhere in the person's record (e.g. "Chicago" in the "Filter" box). If you
 have multiple names in a person's record (e.g. maiden name and married name),
 this tool will match either one. This search method avoids the clumsy
@@ -70,7 +70,11 @@ all the person's different surnames into the surname field. You can create a
 separate "name" record for each name the person has, and then find them easily
 using this tool's search functionality.
 
-## What it does
+I've also sought to make all actions accessible from the keyboard. See [the
+keyboard shortcuts list](KEYBOARD_SHORTCUTS.md) for guidance. This makes it very
+fast to search for and compare people, even in a very large tree.
+
+## How it works
 
 ![Main
 window](https://raw.githubusercontent.com/ajkessel/gedcom-dna-finder/main/docs/screenshots/main-window.png)
@@ -80,7 +84,7 @@ search through the tree's relationship graph (parents, children, siblings,
 spouses) and returns the closest individuals flagged as DNA matches, along with
 the relationship path connecting each match to the target.
 
-Two flag formats are recognized out of the box:
+Two flag formats are recognized by default:
 
 - **AncestryDNA citations.** When an Ancestry-managed tree marks a person as a
   DNA match, the exported GEDCOM contains a source citation with a `PAGE` line
@@ -183,7 +187,8 @@ that builds for all three platforms under WSL.
 
 ## Usage
 
-For pre-built binaries, just run the executable. 
+For pre-built binaries, just run the executable, or download directly from the
+[Mac App Store](https://apps.apple.com/app/gedcom-dna-finder/id6765485580). 
 
 ### Relationship finder
 
@@ -292,7 +297,7 @@ Starting from: John A. Smith (1850-1920) [@I1234@]
        --[child]--> Mary E. Doe (1965-) [@I9876@]
 ```
 
-## Important caveat for Ancestry users
+## Caveat for Ancestry users
 
 Ancestry's GEDCOM export is well known to be lossy and its handling of
 MyTreeTags has varied across versions. If this tool reports far fewer flagged
