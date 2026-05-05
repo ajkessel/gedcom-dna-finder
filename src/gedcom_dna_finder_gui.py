@@ -2428,7 +2428,7 @@ class DNAMatchFinderApp:
         text_frame.pack(fill='both', expand=True)
         vsb = ttk.Scrollbar(text_frame, orient='vertical')
         text = tk.Text(text_frame, wrap='word', padx=12, pady=8,
-                       relief='flat', borderwidth=0,
+                       relief='flat', borderwidth=0, font='TkTextFont',
                        yscrollcommand=vsb.set)
         vsb.configure(command=text.yview)
         vsb.pack(side='right', fill='y')
