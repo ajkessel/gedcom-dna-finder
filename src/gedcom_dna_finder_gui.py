@@ -2445,8 +2445,42 @@ class DNAMatchFinderApp:
         vsb.pack(side='right', fill='y')
         text.pack(side='left', fill='both', expand=True)
 
+        base_dir = os.path.dirname(os.path.abspath(filepath))
+
+        def _set_state(enabled):
+            if sys.platform == 'darwin':
+                if enabled:
+                    text.unbind('<Key>')
+                else:
+                    text.bind('<Key>', lambda e: 'break')
+            else:
+                text.configure(state='normal' if enabled else 'disabled')
+
+        def _nav_handler(url):
+            if not url.startswith(('http://', 'https://')) and url.endswith('.md'):
+                target = os.path.normpath(os.path.join(base_dir, url))
+                try:
+                    with open(target, 'r', encoding='utf-8') as f:
+                        new_content = f.read()
+                except OSError:
+                    webbrowser.open(url)
+                    return
+                win.title(os.path.splitext(os.path.basename(target))[0]
+                          .replace('_', ' ').title())
+                for tag in list(text.tag_names()):
+                    if tag.startswith('_url_'):
+                        text.tag_delete(tag)
+                text._link_count = 0
+                _set_state(True)
+                text.delete('1.0', 'end')
+                self._render_markdown(text, new_content, url_handler=_nav_handler)
+                _set_state(False)
+                text.yview_moveto(0)
+            else:
+                webbrowser.open(url)
+
         if markdown:
-            self._render_markdown(text, content)
+            self._render_markdown(text, content, url_handler=_nav_handler)
         else:
             text.insert('1.0', content)
 
@@ -2471,7 +2505,7 @@ class DNAMatchFinderApp:
         win.lift()
         win.focus_set()
 
-    def _render_markdown(self, widget, content):
+    def _render_markdown(self, widget, content, url_handler=None):
         """Render basic markdown into a tkinter Text widget using tag formatting."""
         base = tkfont.Font(font=widget.cget('font'))
         info = base.actual()
@@ -2556,7 +2590,7 @@ class DNAMatchFinderApp:
             hm = re.match(r'^(#{1,3})\s+(.*)', stripped)
             if hm:
                 self._insert_inline(widget, hm.group(
-                    2), 'h' + str(len(hm.group(1))))
+                    2), 'h' + str(len(hm.group(1))), url_handler=url_handler)
                 widget.insert('end', '\n')
                 i += 1
                 continue
@@ -2579,7 +2613,7 @@ class DNAMatchFinderApp:
                 widget.insert('end', '│ ', base_tag)
                 for j, cell in enumerate(cells):
                     self._insert_inline(
-                        widget, cell, base_tag, bold_tag='table_bold')
+                        widget, cell, base_tag, bold_tag='table_bold', url_handler=url_handler)
                     pad = (_col_widths[j] - _visual_len(cell)
                            if j < len(_col_widths) else 0)
                     suffix = ' ' * max(0, pad) + ' │'
@@ -2593,7 +2627,7 @@ class DNAMatchFinderApp:
             # Bullet list
             bm = re.match(r'^[-*+]\s+(.*)', stripped)
             if bm:
-                self._insert_inline(widget, '• ' + bm.group(1), 'bullet')
+                self._insert_inline(widget, '• ' + bm.group(1), 'bullet', url_handler=url_handler)
                 widget.insert('end', '\n')
                 i += 1
                 continue
@@ -2602,7 +2636,7 @@ class DNAMatchFinderApp:
             nm = re.match(r'^(\d+\.)\s+(.*)', stripped)
             if nm:
                 self._insert_inline(widget, nm.group(
-                    1) + ' ' + nm.group(2), 'bullet')
+                    1) + ' ' + nm.group(2), 'bullet', url_handler=url_handler)
                 widget.insert('end', '\n')
                 i += 1
                 continue
@@ -2614,14 +2648,14 @@ class DNAMatchFinderApp:
                 continue
 
             # Normal paragraph line
-            self._insert_inline(widget, line, 'normal')
+            self._insert_inline(widget, line, 'normal', url_handler=url_handler)
             widget.insert('end', '\n')
             i += 1
 
         if code_acc:
             widget.insert('end', '\n'.join(code_acc) + '\n', 'code_block')
 
-    def _insert_inline(self, widget, text, base_tag, bold_tag='bold'):
+    def _insert_inline(self, widget, text, base_tag, bold_tag='bold', url_handler=None):
         """Insert text with inline markdown (bold, italic, code, links) into widget."""
         pos = 0
         for m in _INLINE_RE.finditer(text):
@@ -2634,10 +2668,11 @@ class DNAMatchFinderApp:
                 lc = getattr(widget, '_link_count', 0)
                 widget._link_count = lc + 1
                 tag = f'_url_{lc}'
+                _open = url_handler if url_handler is not None else webbrowser.open
                 widget.tag_configure(
                     tag, foreground=self._link_color, underline=True)
                 widget.tag_bind(tag, '<Button-1>', lambda _,
-                                u=url: _open_url(u))
+                                u=url, h=_open: h(u))
                 widget.tag_bind(
                     tag, '<Enter>', lambda _: widget.config(cursor='hand2'))
                 widget.tag_bind(

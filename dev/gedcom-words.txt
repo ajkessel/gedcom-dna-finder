@@ -37,6 +37,7 @@ MEIPASS
 Menlo
 MTTAG
 notarytool
+osascript
 padx
 pady
 pers
