@@ -1,8 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
+# cSpell:disable
 a = Analysis(
-    ['../src/gedcom-dna-finder-cli.py'],
+    ['../src/gedcom_dna_finder_cli.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='gedcom-dna-finder-cli',
+    name='gedcom_dna_finder_cli',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -22,6 +22,10 @@ from gedcom_core import (
 class GedcomDataModel:
     """Owns the parsed GEDCOM state and all I/O against it."""
 
+    # Bump this whenever the cached individual/family schema changes so that
+    # stale cache files are automatically discarded and reparsed.
+    _CACHE_VERSION = 3
+
     def __init__(self):
         self.individuals = {}
         self.families = {}
@@ -93,7 +97,8 @@ class GedcomDataModel:
             file_mtime = os.path.getmtime(gedcom_path)
             with cache_file.open('r', encoding='utf-8') as f:
                 data = json.load(f)
-            if (data.get('mtime') != file_mtime
+            if (data.get('cache_version') != self._CACHE_VERSION
+                    or data.get('mtime') != file_mtime
                     or data.get('dna_keyword') != dna_keyword
                     or data.get('page_marker') != page_marker):
                 return None
@@ -107,6 +112,7 @@ class GedcomDataModel:
             cache_dir_path.mkdir(parents=True, exist_ok=True)
             cache_file = self._cache_path(gedcom_path, cache_dir_path)
             payload = {
+                'cache_version': self._CACHE_VERSION,
                 'mtime': os.path.getmtime(gedcom_path),
                 'dna_keyword': dna_keyword,
                 'page_marker': page_marker,

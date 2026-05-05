@@ -19,10 +19,13 @@ set -euo pipefail
 
 TEST_PYPI=0
 for arg in "$@"; do
-    case "$arg" in
-        --test-pypi) TEST_PYPI=1 ;;
-        *) echo "Unknown argument: $arg" >&2; exit 1 ;;
-    esac
+	case "$arg" in
+	--test-pypi) TEST_PYPI=1 ;;
+	*)
+		echo "Unknown argument: $arg" >&2
+		exit 1
+		;;
+	esac
 done
 
 cd "$(dirname "$0")/.."
@@ -46,11 +49,11 @@ echo "==> Built artifacts:"
 ls -lh dist/pypi
 
 if [ "$TEST_PYPI" -eq 1 ]; then
-    echo "==> Uploading to TestPyPI (https://test.pypi.org)..."
-    python3 -m twine upload --repository testpypi dist/pypi/*
+	echo "==> Uploading to TestPyPI (https://test.pypi.org)..."
+	python3 -m twine upload --repository testpypi dist/pypi/*
 else
-    echo "==> Uploading to PyPI..."
-    python3 -m twine upload dist/pypi/*
+	echo "==> Uploading to PyPI..."
+	python3 -m twine upload dist/pypi/*
 fi
 
 echo "==> Done."

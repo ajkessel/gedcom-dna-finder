@@ -13,7 +13,7 @@
 #   .\dev\build-pypi.ps1 -TestPyPI  # build + upload to test.pypi.org
 #
 param(
-    [switch]$TestPyPI
+  [switch]$TestPyPI
 )
 
 Set-StrictMode -Version Latest
@@ -25,7 +25,7 @@ if ( Test-Path .\Venv\Scripts\Activate.ps1 ) {
   & ".\venv\Scripts\Activate.ps1"
 }
 
-if ( -not ( test-path .\dist\pypi ) ) {
+if ( -not ( Test-Path .\dist\pypi ) ) {
   mkdir .\dist\pypi
 }
 
@@ -45,11 +45,12 @@ Write-Host "==> Built artifacts:"
 Get-ChildItem dist/pypi | Select-Object Name, Length | Format-Table -AutoSize
 
 if ($TestPyPI) {
-    Write-Host "==> Uploading to TestPyPI (https://test.pypi.org)..."
-    python -m twine upload --repository testpypi dist/pypi/*
-} else {
-    Write-Host "==> Uploading to PyPI..."
-    python -m twine upload dist/pypi/*
+  Write-Host "==> Uploading to TestPyPI (https://test.pypi.org)..."
+  python -m twine upload --repository testpypi dist/pypi/*
+}
+else {
+  Write-Host "==> Uploading to PyPI..."
+  python -m twine upload dist/pypi/*
 }
 
 Write-Host "==> Done."

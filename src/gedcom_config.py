@@ -95,11 +95,28 @@ class ConfigManager:
     def set_max_depth(self, value):
         self.save_value('max_depth', int(value))
 
+    def get_fuzzy_threshold(self, default=0.72):
+        val = self.load_value('fuzzy_threshold', default)
+        try:
+            return min(1.0, max(0.0, float(val)))
+        except (TypeError, ValueError):
+            return default
+
+    def set_fuzzy_threshold(self, value):
+        self.save_value('fuzzy_threshold', float(value))
+
     def get_show_ids(self):
         return bool(self.load_value('show_ids', False))
 
     def set_show_ids(self, value):
         self.save_value('show_ids', bool(value))
+
+    def get_name_order(self):
+        val = self.load_value('name_order', 'first_last')
+        return val if val in ('first_last', 'last_first') else 'first_last'
+
+    def set_name_order(self, value):
+        self.save_value('name_order', value)
 
     # ------------------------------------------------------------------
     # Platform default path

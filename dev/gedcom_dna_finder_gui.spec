@@ -73,7 +73,7 @@ if sys.platform == 'win32':
         _extra_binaries += [(p, '.') for p in glob.glob(_pat)]
 
 a = Analysis(
-    ['../src/gedcom-dna-finder-gui.py'],
+    ['../src/gedcom_dna_finder_gui.py'],
     pathex=[],
     binaries=_extra_binaries,
     datas=[('../docs/HELP.md', './docs'), ('../docs/LICENSE.md', './docs'),

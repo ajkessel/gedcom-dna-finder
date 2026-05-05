@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0] - 2026-05-05
+
+### Added
+
+- **Biography section in Show Person window** — a new `── Biography ──` section now appears at the top of every Show Person popup, showing Birth, Married (with spouse name, date, and place), Died, and Buried events extracted from the GEDCOM record. Falls back to "(no biographical information found)" when none of these events are recorded.
+- **Name format preference** — a new "Name format" option in Preferences (Display section) lets the user choose between "First Last" (default) and "Last, First" display order. The choice persists across sessions and affects every name shown in the people list, results pane, Show Person window, and family sections. Requires no manual reload.
+- **Adjustable fuzzy threshold in Preferences** — the fuzzy-search similarity cutoff (previously a hardcoded constant) is now a configurable spinbox in Preferences under "Search defaults", accepting values from 0.00 to 1.00. Lower values allow more matches; higher values are stricter. The value is persisted to `settings.json`.
+- **`gedcom_strings.py` — localization-ready string module** — all English user-facing strings displayed by the GUI have been extracted into a new `src/gedcom_strings.py` file. To translate the application, copy the file and replace the string values; no changes to the main GUI code are required.
+
+### Changed
+
+- **GEDCOM data model: surname and given name parsed separately** — the individual record now stores `surname` and `given_name` fields in addition to the combined `name`, extracted from the standard GEDCOM `/Surname/` slash notation. These fields drive the new Last, First name order display.
+- **GEDCOM data model: marriage date and place stored on families** — FAM records now capture `marr_date` and `marr_place` from their `MARR` sub-records. These fields are used by the Biography section to display full marriage details.
+- **Cache version bumped to 3** — the on-disk parse cache schema has changed. Existing cache files are automatically detected as stale and silently replaced on next load; no manual cache clearing is needed.
+- **Script filenames renamed to snake\_case** — `gedcom-dna-finder-cli.py`, `gedcom-dna-finder-gui.py`, `generate-icon.py`, and the two PyInstaller `.spec` files have been renamed to use underscores (`gedcom_dna_finder_cli.py`, `gedcom_dna_finder_gui.py`, `generate_icon.py`, `gedcom_dna_finder_cli.spec`, `gedcom_dna_finder_gui.spec`) for consistency with Python package conventions.
+- **PyPI GUI entry point renamed** — the console-script entry point in `pyproject.toml` was updated from `gedcom-dna-finder-gui` to `gedcom_dna_finder_gui` to match the renamed launcher.
+- **Build scripts updated** — all shell and PowerShell build scripts (`build.sh`, `build.ps1`, `build-linux.sh`, `build-mac.sh`, `build-mac-appstore.sh`, `build-pypi.sh`, `build-pypi.ps1`, `build-and-release.sh`) updated to reference the renamed files and standardized to consistent tab indentation.
+
 ## [0.2.9] - 2026-05-04
 
 ### Added
@@ -53,7 +71,7 @@
 - **Top N and Max Depth persist across sessions** — the "Top N" and "Max Depth" spinboxes in the action bar are now also exposed in the Preferences dialog under a new "Search defaults" section. Values saved there are written to `settings.json` and restored on the next launch, so users no longer need to re-enter their preferred search depth after restarting the application.
 - **Clear Cache button in Preferences** — the Preferences dialog now includes a "Cache" section with a "Clear Cache…" button as an alternative to the existing Menu → Clear cache… entry, making it easier to find in the same place as other application settings.
 - **Privacy Policy menu item** — a new "Privacy Policy" entry at the bottom of the Menu opens a formatted window explaining what data the application stores locally, confirming that it makes no network requests, and describing the cache and its contents.
-- **PyPI packaging** — the project is now structured for distribution on PyPI as `gedcom-dna-finder`. A `pyproject.toml` with full metadata and entry points, a `gedcom_dna_finder/` Python package with `gedcom-dna-finder` (CLI) and `gedcom-dna-finder-gui` (GUI) console scripts, a `hatch_build.py` custom build hook that bundles `src/` scripts and assets into the wheel, and a `dev/build-pypi.ps1` build-and-upload script (supports `-TestPyPI` flag) are all included.
+- **PyPI packaging** — the project is now structured for distribution on PyPI as `gedcom-dna-finder`. A `pyproject.toml` with full metadata and entry points, a `gedcom_dna_finder/` Python package with `gedcom-dna-finder` (CLI) and `gedcom_dna_finder_gui` (GUI) console scripts, a `hatch_build.py` custom build hook that bundles `src/` scripts and assets into the wheel, and a `dev/build-pypi.ps1` build-and-upload script (supports `-TestPyPI` flag) are all included.
 
 ### Changed
 

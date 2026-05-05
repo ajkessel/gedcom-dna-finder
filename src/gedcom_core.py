@@ -129,6 +129,8 @@ def build_model(gedcom_path, dna_keyword, page_marker):
             indi = {
                 'id': head_xref,
                 'name': '',
+                'surname': '',
+                'given_name': '',
                 'alt_names': [],
                 'sex': '',
                 'famc': [],
@@ -149,6 +151,13 @@ def build_model(gedcom_path, dna_keyword, page_marker):
                     cleaned = value.replace('/', '').strip()
                     if not indi['name']:
                         indi['name'] = cleaned
+                        slash_start = value.find('/')
+                        slash_end = value.rfind('/')
+                        if slash_start != -1 and slash_end > slash_start:
+                            indi['surname'] = value[slash_start + 1:slash_end].strip()
+                            indi['given_name'] = value[:slash_start].strip()
+                        else:
+                            indi['given_name'] = cleaned
                     if cleaned:
                         indi['alt_names'].append(cleaned)
                 elif level == 1 and tag == 'SEX':
@@ -194,14 +203,27 @@ def build_model(gedcom_path, dna_keyword, page_marker):
             individuals[head_xref] = indi
 
         elif head_tag == 'FAM':
-            fam = {'id': head_xref, 'husb': None, 'wife': None, 'chil': []}
-            for level, _xref, tag, value in rec[1:]:
+            fam = {'id': head_xref, 'husb': None, 'wife': None, 'chil': [],
+                   'marr_date': '', 'marr_place': ''}
+            n = len(rec)
+            for i, (level, _xref, tag, value) in enumerate(rec):
+                if i == 0:
+                    continue
                 if level == 1 and tag == 'HUSB':
                     fam['husb'] = value.strip()
                 elif level == 1 and tag == 'WIFE':
                     fam['wife'] = value.strip()
                 elif level == 1 and tag == 'CHIL':
                     fam['chil'].append(value.strip())
+                elif level == 1 and tag == 'MARR':
+                    for j in range(i + 1, n):
+                        l2, _, t2, v2 = rec[j]
+                        if l2 <= 1:
+                            break
+                        if l2 == 2 and t2 == 'DATE' and not fam['marr_date']:
+                            fam['marr_date'] = v2.strip()
+                        elif l2 == 2 and t2 == 'PLAC' and not fam['marr_place']:
+                            fam['marr_place'] = v2.strip()
             families[head_xref] = fam
 
     # Pass 3: resolve _MTTAG pointer references against the tag dictionary

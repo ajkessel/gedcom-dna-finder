@@ -2,7 +2,7 @@
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."
 [[ -e ./dist/ ]] && rm -r ./dist/
-[[ -e ./src/gedcom-dna-finder-gui.py ]] || {
+[[ -e ./src/gedcom_dna_finder_gui.py ]] || {
 	echo 'Build files not found.'
 	exit 1
 }

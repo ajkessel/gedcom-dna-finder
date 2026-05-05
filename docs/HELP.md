@@ -70,8 +70,8 @@ Although this software was developed for this DNA use case, you could use it to 
 ### GUI
 
 ```
-python gedcom-dna-finder-gui.py                  # opens with no file loaded
-python gedcom-dna-finder-gui.py /path/to/tree.ged   # auto-loads on startup
+python gedcom_dna_finder_gui.py                  # opens with no file loaded
+python gedcom_dna_finder_gui.py /path/to/tree.ged   # auto-loads on startup
 ```
 
 1. Click **Browse** and select your `.ged` file (or pass it on the
@@ -101,33 +101,33 @@ deciding what tag-keyword filter to use.
 
 ```
 # List all _MTTAG definitions in the file (use "_" as a placeholder for the target)
-python gedcom-dna-finder-cli.py tree.ged --list-tags _
+python gedcom_dna_finder_cli.py tree.ged --list-tags _
 
 # List every flagged individual
-python gedcom-dna-finder-cli.py tree.ged --list-flagged _
+python gedcom_dna_finder_cli.py tree.ged --list-flagged _
 
 # Find the three nearest DNA-flagged relatives by name
-python gedcom-dna-finder-cli.py tree.ged "Jane Doe"
+python gedcom_dna_finder_cli.py tree.ged "Jane Doe"
 
 # Names are matched by whitespace-separated tokens, in any order, each as
 # a case-insensitive substring. The middle name is not required:
 # this matches "John Adam Smith".
-python gedcom-dna-finder-cli.py tree.ged "John Smith"
+python gedcom_dna_finder_cli.py tree.ged "John Smith"
 
 # Fuzzy matching tolerates typos and spelling variants. The default
 # similarity threshold is 0.6; raise it for stricter matches.
-python gedcom-dna-finder-cli.py tree.ged "John Smth" --fuzzy
-python gedcom-dna-finder-cli.py tree.ged "John Smth" --fuzzy --fuzzy-threshold 0.75
+python gedcom_dna_finder_cli.py tree.ged "John Smth" --fuzzy
+python gedcom_dna_finder_cli.py tree.ged "John Smth" --fuzzy --fuzzy-threshold 0.75
 
 # Find by exact INDI ID
-python gedcom-dna-finder-cli.py tree.ged @I1234@
+python gedcom_dna_finder_cli.py tree.ged @I1234@
 
 # Restrict the tag filter to actual DNA matches only (excludes
 # "DNA Connection" or "Common DNA Ancestor" if you use those tags)
-python gedcom-dna-finder-cli.py tree.ged "Jane Doe" --tag-keyword "DNA Match"
+python gedcom_dna_finder_cli.py tree.ged "Jane Doe" --tag-keyword "DNA Match"
 
 # Return the top 5 nearest matches with a deeper search
-python gedcom-dna-finder-cli.py tree.ged "Jane Doe" --top 5 --max-depth 80
+python gedcom_dna_finder_cli.py tree.ged "Jane Doe" --top 5 --max-depth 80
 ```
 
 #### Full CLI options

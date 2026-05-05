@@ -8,11 +8,17 @@ if [[ "$STDBUF_ACTIVE" != "1" ]]; then
 	exec stdbuf -oL "$0" "$@"
 fi
 while getopts "hn:" opt; do
-  case $opt in
-    h) echo "Usage: $0 [-h] [-n]"; exit 0 ;;
-    n) DRY=true ;;
-    *) echo "Invalid option"; exit 1 ;;
-  esac
+	case $opt in
+	h)
+		echo "Usage: $0 [-h] [-n]"
+		exit 0
+		;;
+	n) DRY=true ;;
+	*)
+		echo "Invalid option"
+		exit 1
+		;;
+	esac
 done
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."

@@ -44,7 +44,7 @@ gedcom-dna-finder = "gedcom_dna_finder.cli:main"
 
 # GUI entry point (no console window on Windows)
 [project.gui-scripts]
-gedcom-dna-finder-gui = "gedcom_dna_finder.gui:main"
+gedcom_dna_finder_gui = "gedcom_dna_finder.gui:main"
 
 # hatch_build.py sets build_data["force_include"] dynamically, so hatchling's
 # auto-discovery must be disabled to prevent it including dev/ files.

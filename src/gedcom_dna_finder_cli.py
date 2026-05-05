@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+# cspell:ignore smth
 """
-gedcom-dna-finder-gui.py
+gedcom_dna_finder_cli.py
 
 Given a GEDCOM file and a target person, find the closest relative(s)
 who are flagged as DNA matches.
@@ -28,29 +29,29 @@ Pure stdlib; no external dependencies.
 Usage examples:
 
   # Inspect all tag definitions present in your GEDCOM
-  python gedcom-dna-finder-cli.py tree.ged --list-tags
+  python gedcom_dna_finder_cli.py tree.ged --list-tags
 
   # List every DNA-flagged person
-  python gedcom-dna-finder-cli.py tree.ged --list-flagged
+  python gedcom_dna_finder_cli.py tree.ged --list-flagged
 
   # Find the 3 nearest DNA-flagged relatives of a person, by name
-  python gedcom-dna-finder-cli.py tree.ged "John A Smith"
+  python gedcom_dna_finder_cli.py tree.ged "John A Smith"
 
   # Names are tokenized: this matches "John Adam Smith"
   # without needing the middle name.
-  python gedcom-dna-finder-cli.py tree.ged "John Smith"
+  python gedcom_dna_finder_cli.py tree.ged "John Smith"
 
   # Find by exact INDI ID (with or without surrounding @)
-  python gedcom-dna-finder-cli.py tree.ged @I1234@
-  python gedcom-dna-finder-cli.py tree.ged I1234
+  python gedcom_dna_finder_cli.py tree.ged @I1234@
+  python gedcom_dna_finder_cli.py tree.ged I1234
 
   # Tighten the tag filter to "DNA Match" only (exclude DNA Connection etc.)
-  python gedcom-dna-finder-cli.py tree.ged "John Smith" --tag-keyword "DNA Match"
+  python gedcom_dna_finder_cli.py tree.ged "John Smith" --tag-keyword "DNA Match"
 
   # Fuzzy match (tolerates typos and spelling variants):
   # "John Smth" will still find "John Adam Smith".
-  python gedcom-dna-finder-cli.py tree.ged "John Smith" --fuzzy
-  python gedcom-dna-finder-cli.py tree.ged "John Smith" --fuzzy --fuzzy-threshold 0.7
+  python gedcom_dna_finder_cli.py tree.ged "John Smith" --fuzzy
+  python gedcom_dna_finder_cli.py tree.ged "John Smith" --fuzzy --fuzzy-threshold 0.7
 """
 
 import argparse
@@ -62,7 +63,6 @@ import sys
 from gedcom_core import (
     build_model,
     bfs_find_dna_matches,
-    lifespan,
     describe,
     extract_ged_from_zip,
 )
@@ -187,7 +187,8 @@ def main():
                                        'Names are matched by whitespace-separated tokens, '
                                        'each as a case-insensitive substring, in any order — '
                                        'so "John Smith" matches "John Adam Smith". '
-                                       'Use "_" as a placeholder when combined with --list-tags or --list-flagged.')
+                                       'Use "_" as a placeholder when combined with '
+                                       '--list-tags or --list-flagged.')
     parser.add_argument('--top', type=int, default=3,
                         help='Number of nearest matches to return (default 3).')
     parser.add_argument('--max-depth', type=int, default=50,
@@ -197,7 +198,8 @@ def main():
                              'Default: "AncestryDNA Match".')
     parser.add_argument('--tag-keyword', default='DNA',
                         help='Case-insensitive substring to match in _MTTAG NAME values. '
-                             'Default: "DNA". Use "DNA Match" to exclude DNA Connection / Common DNA Ancestor.')
+                             'Default: "DNA". '
+                             'Use "DNA Match" to exclude DNA Connection / Common DNA Ancestor.')
     parser.add_argument('--fuzzy', action='store_true',
                         help='Enable fuzzy name matching. In addition to token matches, '
                              'include names whose similarity to the query exceeds '
@@ -219,7 +221,7 @@ def main():
             tmp_path, ged_name = extract_ged_from_zip(gedcom_path)
             print(f'Extracted {ged_name!r} from ZIP.', file=sys.stderr)
             gedcom_path = tmp_path
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             print(f'Error: {e}', file=sys.stderr)
             sys.exit(1)
 

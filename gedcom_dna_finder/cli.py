@@ -26,12 +26,12 @@ def main():
     sd = _scripts_dir()
     if sd is None:
         raise RuntimeError(
-            "Cannot locate gedcom-dna-finder-cli.py. "
+            "Cannot locate gedcom_dna_finder_cli.py. "
             "Re-install the package or run from the source tree."
         )
     if sd not in sys.path:
         sys.path.insert(0, sd)
-    script = os.path.join(sd, "gedcom-dna-finder-cli.py")
+    script = os.path.join(sd, "gedcom_dna_finder_cli.py")
     spec = importlib.util.spec_from_file_location("gedcom_dna_finder_cli", script)
     mod = importlib.util.module_from_spec(spec)
     sys.modules["gedcom_dna_finder_cli"] = mod

@@ -3,8 +3,8 @@
 # intended to run from WSL instance with access to local powershell and mac accessible via ssh with source code installed at hostname 'mac'
 # include -c as command line switch to create new release, otherwise latest release will be used
 if [[ "$STDBUF_ACTIVE" != "1" ]]; then
-  export STDBUF_ACTIVE=1
-  exec stdbuf -oL "$0" "$@"
+	export STDBUF_ACTIVE=1
+	exec stdbuf -oL "$0" "$@"
 fi
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 cd "${SCRIPT_DIR}/.."
@@ -15,12 +15,12 @@ if [ "$1" == "-c" ]; then
 fi
 current=$(gh release list --json tagName,isLatest --jq '.[] | select(.isLatest) | .tagName')
 [ "$current" ] || {
-  echo 'Error finding current release number.'
-  exit 1
+	echo 'Error finding current release number.'
+	exit 1
 }
 git pull || {
-  echo 'Error updating from git.'
-  exit 1
+	echo 'Error updating from git.'
+	exit 1
 }
 source .venv/bin/activate
 echo 'Building for Linux platform...'
