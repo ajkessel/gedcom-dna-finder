@@ -34,6 +34,7 @@ lmargin
 marr
 MARR
 MEIPASS
+Menlo
 MTTAG
 notarytool
 padx
