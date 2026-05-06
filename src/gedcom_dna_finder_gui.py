@@ -363,9 +363,7 @@ class DNAMatchFinderApp(DialogsMixin, AppearanceMixin):
         ttk.Label(results_header, text=LBL_RESULTS).pack(side='left')
         ttk.Button(results_header, text=BTN_COPY, underline=0,
                    command=self._copy_results).pack(side='right')
-        ttk.Button(results_header, text=BTN_CLEAR, underline=1,
-                   command=self._clear_results).pack(side='right', padx=(0, 4))
-
+        
         self.results = scrolledtext.ScrolledText(
             right, font=self._mono_font, wrap='word', height=10
         )
