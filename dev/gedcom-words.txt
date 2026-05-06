@@ -22,6 +22,7 @@ gedcom
 Gedcom
 GEDCOM
 Geni
+gsettings
 husb
 HUSB
 indi

@@ -1,0 +1,219 @@
+"""
+gedcom_markdown.py
+
+Standalone markdown-to-tkinter-Text renderer.  No dependency on the app
+class; callers pass link_color explicitly.
+"""
+
+import re
+import sys
+import webbrowser
+import tkinter.font as tkfont
+
+
+# Inline markdown: image (skip), link, bold, italic, code
+_INLINE_RE = re.compile(
+    r'!\[[^\]]*\]\([^)]*\)'      # image – discard, no capture groups
+    r'|\[([^\]]+)\]\(([^)]+)\)'  # link: g1 = display text, g2 = URL
+    r'|\*\*(.+?)\*\*'            # bold: g3
+    r'|\*(.+?)\*'                # italic: g4
+    r'|`(.+?)`'                  # inline code: g5
+)
+
+
+def _visual_len(text):
+    """Return rendered length of markdown text after stripping markup markers."""
+    t = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    t = re.sub(r'\*(.+?)\*', r'\1', t)
+    t = re.sub(r'`(.+?)`', r'\1', t)
+    t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
+    t = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', t)
+    return len(t)
+
+
+def render_markdown(widget, content, link_color='#0066cc', url_handler=None):
+    """Render basic markdown into a tkinter Text widget using tag formatting."""
+    base = tkfont.Font(font=widget.cget('font'))
+    info = base.actual()
+    family = info['family']
+    size = abs(info['size']) or 10
+    mono = 'Menlo' if sys.platform == 'darwin' else 'Courier'
+
+    widget.tag_configure('h1', font=(
+        family, size + 7, 'bold'), spacing1=10, spacing3=5)
+    widget.tag_configure('h2', font=(
+        family, size + 4, 'bold'), spacing1=8, spacing3=4)
+    widget.tag_configure('h3', font=(
+        family, size + 2, 'bold'), spacing1=6, spacing3=3)
+    widget.tag_configure('bold', font=(family, size, 'bold'))
+    widget.tag_configure('italic', font=(family, size, 'italic'))
+    widget.tag_configure('code_inline', font=(
+        mono, size - 1), background='#f0f0f0')
+    widget.tag_configure('code_block', font=(mono, size - 1), background='#f0f0f0',
+                         lmargin1=16, lmargin2=16, spacing1=1, spacing3=1)
+    widget.tag_configure('link', foreground=link_color)
+    widget.tag_configure('bullet', lmargin1=16, lmargin2=32)
+    widget.tag_configure('normal', font=(family, size))
+    widget.tag_configure('table_cell', font=(mono, size - 1))
+    widget.tag_configure('table_bold', font=(mono, size - 1, 'bold'))
+
+    lines = content.split('\n')
+
+    # Pre-scan: compute max visual column widths across all table rows
+    _col_widths: list = []
+    for _ln in lines:
+        _s = _ln.strip()
+        if (_s.startswith('|') and _s.endswith('|')
+                and not re.match(r'^\|[\s\-:|]+\|$', _s)):
+            _cells = [c.strip() for c in _s[1:-1].split('|')]
+            for _j, _cell in enumerate(_cells):
+                _vl = _visual_len(_cell)
+                if _j >= len(_col_widths):
+                    _col_widths.append(_vl)
+                else:
+                    _col_widths[_j] = max(_col_widths[_j], _vl)
+    _divider_width = (sum(_col_widths) + 3 * len(_col_widths) + 1
+                      if _col_widths else 64)
+
+    i = 0
+    in_code = False
+    code_acc = []
+
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        # Fenced code block toggle
+        if stripped.startswith('```'):
+            if in_code:
+                widget.insert('end', '\n'.join(code_acc) + '\n', 'code_block')
+                code_acc = []
+                in_code = False
+            else:
+                in_code = True
+            i += 1
+            continue
+
+        if in_code:
+            code_acc.append(line)
+            i += 1
+            continue
+
+        # ASCII-art table border row (+---+---+ or +===+===+)
+        if re.match(r'^\+[-=+]+\+$', stripped):
+            widget.insert('end', '─' * _divider_width + '\n', 'table_cell')
+            i += 1
+            continue
+
+        # GFM table separator row – skip
+        if re.match(r'^\|[\s\-:|]+\|$', stripped):
+            i += 1
+            continue
+
+        # ATX headers (up to ###)
+        hm = re.match(r'^(#{1,3})\s+(.*)', stripped)
+        if hm:
+            insert_inline(widget, hm.group(2), 'h' + str(len(hm.group(1))),
+                          link_color, url_handler=url_handler)
+            widget.insert('end', '\n')
+            i += 1
+            continue
+
+        # Horizontal rule
+        if re.match(r'^[-*_]{3,}\s*$', stripped):
+            widget.insert('end', '─' * 64 + '\n', 'normal')
+            i += 1
+            continue
+
+        # Table row
+        if stripped.startswith('|') and stripped.endswith('|'):
+            cells = [c.strip() for c in stripped[1:-1].split('|')]
+            next_line = lines[i + 1].strip() if i + 1 < len(lines) else ''
+            is_header = bool(
+                re.match(r'^\|[\s\-:|]+\|$', next_line) or
+                re.match(r'^\+[=+]+\+$', next_line)
+            )
+            base_tag = 'table_bold' if is_header else 'table_cell'
+            widget.insert('end', '│ ', base_tag)
+            for j, cell in enumerate(cells):
+                insert_inline(widget, cell, base_tag, link_color,
+                              bold_tag='table_bold', url_handler=url_handler)
+                pad = (_col_widths[j] - _visual_len(cell)
+                       if j < len(_col_widths) else 0)
+                suffix = ' ' * max(0, pad) + ' │'
+                if j < len(cells) - 1:
+                    suffix += ' '
+                widget.insert('end', suffix, base_tag)
+            widget.insert('end', '\n')
+            i += 1
+            continue
+
+        # Bullet list
+        bm = re.match(r'^[-*+]\s+(.*)', stripped)
+        if bm:
+            insert_inline(widget, '• ' + bm.group(1), 'bullet', link_color,
+                          url_handler=url_handler)
+            widget.insert('end', '\n')
+            i += 1
+            continue
+
+        # Numbered list
+        nm = re.match(r'^(\d+\.)\s+(.*)', stripped)
+        if nm:
+            insert_inline(widget, nm.group(1) + ' ' + nm.group(2), 'bullet',
+                          link_color, url_handler=url_handler)
+            widget.insert('end', '\n')
+            i += 1
+            continue
+
+        # Empty line
+        if not stripped:
+            widget.insert('end', '\n')
+            i += 1
+            continue
+
+        # Normal paragraph line
+        insert_inline(widget, line, 'normal', link_color,
+                      url_handler=url_handler)
+        widget.insert('end', '\n')
+        i += 1
+
+    if code_acc:
+        widget.insert('end', '\n'.join(code_acc) + '\n', 'code_block')
+
+
+def insert_inline(widget, text, base_tag, link_color='#0066cc',
+                  bold_tag='bold', url_handler=None):
+    """Insert text with inline markdown (bold, italic, code, links) into widget."""
+    pos = 0
+    for m in _INLINE_RE.finditer(text):
+        if m.start() > pos:
+            widget.insert('end', text[pos:m.start()], base_tag)
+        g1, g2, g3, g4, g5 = m.group(1), m.group(
+            2), m.group(3), m.group(4), m.group(5)
+        if g1 is not None:
+            url = g2
+            lc = getattr(widget, '_link_count', 0)
+            widget._link_count = lc + 1
+            tag = f'_url_{lc}'
+            _open = url_handler if url_handler is not None else webbrowser.open
+            widget.tag_configure(tag, foreground=link_color, underline=True)
+            widget.tag_bind(tag, '<Button-1>', lambda _, u=url, h=_open: h(u))
+            widget.tag_bind(
+                tag, '<Enter>', lambda _: widget.config(cursor='hand2'))
+            widget.tag_bind(
+                tag, '<Leave>', lambda _: widget.config(cursor=''))
+            if not hasattr(widget, '_url_tags'):
+                widget._url_tags = {}
+            widget._url_tags[tag] = url
+            widget.insert('end', g1, (base_tag, tag))
+        elif g3 is not None:
+            widget.insert('end', g3, (base_tag, bold_tag))
+        elif g4 is not None:
+            widget.insert('end', g4, (base_tag, 'italic'))
+        elif g5 is not None:
+            widget.insert('end', g5, 'code_inline')
+        # else: image – discard silently
+        pos = m.end()
+    if pos < len(text):
+        widget.insert('end', text[pos:], base_tag)

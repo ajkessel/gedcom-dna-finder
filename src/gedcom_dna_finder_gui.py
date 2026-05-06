@@ -34,6 +34,14 @@ from gedcom_core import (
     describe,
     extract_ged_from_zip,
 )
+from gedcom_relationship import (
+    _extract_event,
+    get_ancestor_depths,
+    get_descendant_depths,
+    describe_relationship,
+)
+from gedcom_markdown import render_markdown
+from gedcom_theme import _detect_system_theme, Tooltip, THEME_NAMES, THEMES
 import argparse
 import difflib
 import os
@@ -42,42 +50,6 @@ import subprocess
 import sys
 import threading
 import webbrowser
-from collections import deque
-
-
-def _detect_system_theme():
-    """Return 'Dark' or 'Light' based on the OS dark-mode setting."""
-    if sys.platform == 'darwin':
-        try:
-            result = subprocess.run(
-                ['defaults', 'read', '-g', 'AppleInterfaceStyle'],
-                capture_output=True, text=True,
-            )
-            return 'Dark' if result.stdout.strip().lower() == 'dark' else 'Light'
-        except Exception:
-            return 'Light'
-    elif sys.platform == 'win32':
-        try:
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize',
-            )
-            value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')
-            winreg.CloseKey(key)
-            return 'Light' if value == 1 else 'Dark'
-        except Exception:
-            return 'Light'
-    else:
-        # Linux / other: try the freedesktop color-scheme preference
-        try:
-            result = subprocess.run(
-                ['gsettings', 'get', 'org.gnome.desktop.interface', 'color-scheme'],
-                capture_output=True, text=True,
-            )
-            return 'Dark' if 'dark' in result.stdout.lower() else 'Light'
-        except Exception:
-            return 'Light'
 
 
 def _open_url(url):
@@ -88,37 +60,6 @@ def _open_url(url):
         subprocess.run(['/usr/bin/open', url], check=False)
     else:
         webbrowser.open(url)
-
-
-class Tooltip:
-    """Small hover tooltip attached to a Tkinter widget."""
-
-    def __init__(self, widget, text):
-        """Bind tooltip display behavior to widget hover events."""
-        self._widget = widget
-        self._text = text
-        self._tip = None
-        widget.bind('<Enter>', self._show)
-        widget.bind('<Leave>', self._hide)
-
-    def _show(self, _event=None):
-        """Create and position the tooltip window."""
-        x = self._widget.winfo_rootx() + 20
-        y = self._widget.winfo_rooty() + self._widget.winfo_height() + 4
-        self._tip = tk.Toplevel(self._widget)
-        self._tip.wm_overrideredirect(True)
-        self._tip.wm_geometry(f'+{x}+{y}')
-        tk.Label(
-            self._tip, text=self._text, justify='left',
-            background='#ffffe0', relief='solid', borderwidth=1,
-            wraplength=360, padx=4, pady=2,
-        ).pack()
-
-    def _hide(self, _event=None):
-        """Destroy the tooltip window if it is visible."""
-        if self._tip:
-            self._tip.destroy()
-            self._tip = None
 
 
 def _read_version():
@@ -142,317 +83,6 @@ def _read_version():
 __version__, __release_date__ = _read_version()
 
 
-# Inline markdown: image (skip), link, bold, italic, code
-_INLINE_RE = re.compile(
-    r'!\[[^\]]*\]\([^)]*\)'      # image – discard, no capture groups
-    r'|\[([^\]]+)\]\(([^)]+)\)'  # link: g1 = display text, g2 = URL
-    r'|\*\*(.+?)\*\*'            # bold: g3
-    r'|\*(.+?)\*'                # italic: g4
-    r'|`(.+?)`'                  # inline code: g5
-)
-
-
-def _visual_len(text):
-    """Return rendered length of markdown text after stripping markup markers."""
-    t = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    t = re.sub(r'\*(.+?)\*', r'\1', t)
-    t = re.sub(r'`(.+?)`', r'\1', t)
-    t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
-    t = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', t)
-    return len(t)
-
-
-# ---------------------------------------------------------------------------
-# GEDCOM event helpers
-# ---------------------------------------------------------------------------
-
-def _extract_event(raw, event_tag):
-    """Return (date_str, place_str) for the first occurrence of event_tag in raw."""
-    date, place = '', ''
-    in_event = False
-    for level, _xref, tag, value in raw:
-        if level == 1:
-            if tag == event_tag:
-                in_event = True
-                date, place = '', ''
-            elif in_event:
-                break  # left the event's sub-records
-            else:
-                in_event = False
-        elif in_event and level == 2:
-            if tag == 'DATE' and not date:
-                date = value.strip()
-            elif tag == 'PLAC' and not place:
-                place = value.strip()
-    return date, place
-
-
-# ---------------------------------------------------------------------------
-# Relationship narrative helpers
-# ---------------------------------------------------------------------------
-
-def _edge_to_term(edge, sex):
-    """Single edge + target sex → plain-English word."""
-    if edge in ('father', 'mother'):
-        return edge
-    if edge == 'sibling':
-        return 'brother' if sex == 'M' else ('sister' if sex == 'F' else 'sibling')
-    if edge == 'child':
-        return 'son' if sex == 'M' else ('daughter' if sex == 'F' else 'child')
-    if edge == 'spouse':
-        return 'husband' if sex == 'M' else ('wife' if sex == 'F' else 'spouse')
-    return edge
-
-
-_ORDINALS = ['', 'first', 'second', 'third', 'fourth', 'fifth',
-             'sixth', 'seventh', 'eighth', 'ninth', 'tenth']
-_REMOVALS = {1: 'once', 2: 'twice', 3: 'three times',
-             4: 'four times', 5: 'five times'}
-
-
-def _nth_great(n):
-    """Return 'great-' for n==1, '2nd-great-' for n==2, '3rd-great-' for n==3, etc.
-
-    n==0 returns ''. Used to build compact ancestor/descendant labels.
-    """
-    if n == 0:
-        return ''
-    if n == 1:
-        return 'great-'
-    if 11 <= n % 100 <= 13:
-        suffix = 'th'
-    else:
-        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
-    return f'{n}{suffix}-great-'
-
-
-def get_ancestor_depths(start_id, individuals, families):
-    """BFS over father/mother edges only → {ancestor_id: depth from start}."""
-    depths = {}
-    queue = deque([(start_id, 0)])
-    visited = {start_id}
-    while queue:
-        current_id, depth = queue.popleft()
-        indi = individuals.get(current_id)
-        if not indi:
-            continue
-        for fam_id in indi['famc']:
-            fam = families.get(fam_id)
-            if not fam:
-                continue
-            for parent_id in (fam['husb'], fam['wife']):
-                if parent_id and parent_id not in visited:
-                    visited.add(parent_id)
-                    depths[parent_id] = depth + 1
-                    queue.append((parent_id, depth + 1))
-    return depths
-
-
-def get_descendant_depths(start_id, individuals, families):
-    """BFS over child edges only → {descendant_id: depth from start}."""
-    depths = {}
-    queue = deque([(start_id, 0)])
-    visited = {start_id}
-    while queue:
-        current_id, depth = queue.popleft()
-        indi = individuals.get(current_id)
-        if not indi:
-            continue
-        for fam_id in indi['fams']:
-            fam = families.get(fam_id)
-            if not fam:
-                continue
-            for child_id in fam['chil']:
-                if child_id and child_id not in visited:
-                    visited.add(child_id)
-                    depths[child_id] = depth + 1
-                    queue.append((child_id, depth + 1))
-    return depths
-
-
-def describe_relationship(path, individuals, ancestors=None, descendants=None):
-    """Return a plain-English relationship from path[0] to path[-1].
-
-    Recognizes ancestors, descendants, siblings, spouses, cousins (all degrees
-    and removals), aunts/uncles, nieces/nephews, in-laws, and step-relations.
-    Falls back to a possessive chain (e.g. "father's brother's son") for paths
-    that don't fit a standard pattern.
-
-    ancestors  — optional dict {indi_id: depth} of biological ancestors of
-                 path[0], computed by get_ancestor_depths().  When provided,
-                 a target who is a known ancestor is always labelled by the
-                 direct ancestor term, even if the current path reaches them
-                 via a spouse edge (which would otherwise produce "step-X").
-    descendants — same idea for biological descendants.
-    """
-    if len(path) <= 1:
-        return 'same person'
-
-    edges = [e for _, e in path[1:]]
-    sexes = [individuals.get(nid, {}).get('sex', '') for nid, _ in path]
-    target_sex = sexes[-1]
-    up_set = {'father', 'mother'}
-
-    def chain():
-        return "'s ".join(_edge_to_term(edges[i], sexes[i + 1]) for i in range(len(edges)))
-
-    def segmented():
-        """Split at first *internal* spouse crossing and describe each part.
-
-        e.g. [father, sibling, child, child, spouse, father, father, father]
-        → "first cousin once removed's wife's great-grandfather"
-        Returns None when no useful split is possible.
-        """
-        sp_idx = next((i for i, e in enumerate(edges) if e == 'spouse'), None)
-        if sp_idx is None or sp_idx == 0:
-            return None
-        seg1 = path[:sp_idx + 1]
-        spouse_id = path[sp_idx + 1][0]
-        spouse_sex = individuals.get(spouse_id, {}).get('sex', '')
-        sp_term = ('wife' if spouse_sex == 'F'
-                   else 'husband' if spouse_sex == 'M' else 'spouse')
-        seg2 = [(spouse_id, None)] + list(path[sp_idx + 2:])
-        rel1 = describe_relationship(seg1, individuals)
-        rel2 = describe_relationship(
-            seg2, individuals) if len(seg2) > 1 else ''
-        return f"{rel1}'s {sp_term}'s {rel2}" if rel2 else f"{rel1}'s {sp_term}"
-
-    def ancestor_term(n, sex):
-        if n == 1:
-            return 'father' if sex == 'M' else ('mother' if sex == 'F' else 'parent')
-        gp = 'grandfather' if sex == 'M' else (
-            'grandmother' if sex == 'F' else 'grandparent')
-        return _nth_great(n - 2) + gp
-
-    def descendant_term(n, sex):
-        if n == 1:
-            return 'son' if sex == 'M' else ('daughter' if sex == 'F' else 'child')
-        gc = 'grandson' if sex == 'M' else (
-            'granddaughter' if sex == 'F' else 'grandchild')
-        return _nth_great(n - 2) + gc
-
-    # If the target is a known biological ancestor/descendant, use the direct
-    # label regardless of the (possibly indirect) path being examined.  This
-    # prevents an alternate route through a spouse edge from producing a
-    # spurious "step-" prefix (e.g. me→mother→grandmother→grandfather should
-    # still read "grandfather", not "step-grandfather").
-    target_id = path[-1][0]
-    if ancestors and target_id in ancestors:
-        return ancestor_term(ancestors[target_id], target_sex)
-    if descendants and target_id in descendants:
-        return descendant_term(descendants[target_id], target_sex)
-
-    # Pure ancestor (all father/mother edges)
-    if all(e in up_set for e in edges):
-        return ancestor_term(len(edges), target_sex)
-
-    # Pure descendant (all child edges)
-    if all(e == 'child' for e in edges):
-        return descendant_term(len(edges), target_sex)
-
-    # Single edge (sibling, spouse, etc.)
-    if len(edges) == 1:
-        return _edge_to_term(edges[0], target_sex)
-
-    # Strip exactly one leading or one trailing spouse; anything else → chain
-    inner = list(edges)
-    lead_sp = trail_sp = 0
-    while inner and inner[0] == 'spouse':
-        lead_sp += 1
-        inner.pop(0)
-    while inner and inner[-1] == 'spouse':
-        trail_sp += 1
-        inner.pop()
-    if not inner or lead_sp > 1 or trail_sp > 1 or (lead_sp and trail_sp):
-        return segmented() or chain()
-
-    # Validate inner: all-up → optional single sibling → all-down.
-    # If the sequence fails because of interior spouse edges (path navigated
-    # through a family unit rather than directly), strip those spouse edges
-    # and retry — they don't change the fundamental relationship.
-    def _classify(seq):
-        st = 'up'
-        uu = dd = ss = 0
-        ok = True
-        for e in seq:
-            if st == 'up':
-                if e in up_set:
-                    uu += 1
-                elif e == 'sibling':
-                    ss += 1
-                    st = 'down'
-                elif e == 'child':
-                    dd += 1
-                    st = 'down'
-                else:
-                    ok = False
-                    break
-            elif st == 'down':
-                if e == 'child':
-                    dd += 1
-                else:
-                    ok = False
-                    break
-        return uu, dd, ss, ok
-
-    u, d, s, valid = _classify(inner)
-    if not valid:
-        # Retry 1: strip interior spouse edges (family-unit crossings that
-        # don't change the relationship degree).
-        no_sp = [e for e in inner if e != 'spouse']
-        if no_sp != inner:
-            u, d, s, valid = _classify(no_sp)
-        else:
-            no_sp = inner
-        # Retry 2: strip a trailing sibling edge.  The sibling of an Nth
-        # cousin / niece / uncle at a given degree is still at that same
-        # degree, so the relationship label is unchanged.  (Retry 1 must run
-        # first so no_sp is already spouse-free before we trim the tail.)
-        if not valid and no_sp and no_sp[-1] == 'sibling':
-            trimmed = no_sp[:-1]
-            if trimmed:
-                u, d, s, valid = _classify(trimmed)
-    if not valid:
-        return segmented() or chain()
-
-    u_eff = u + s
-    d_eff = d + s
-
-    # Inner is all-up: spouse + ancestors → in-law; ancestors + spouse → step-
-    if d_eff == 0:
-        return (ancestor_term(u, target_sex) + '-in-law' if lead_sp
-                else 'step-' + ancestor_term(u, target_sex))
-
-    # Inner is all-down: descendants + spouse → in-law; spouse + descendants → step-
-    if u_eff == 0:
-        return (descendant_term(d, target_sex) + '-in-law' if trail_sp
-                else 'step-' + descendant_term(d, target_sex))
-
-    # Cousin-type: compute degree and number of removals
-    cn = min(u_eff, d_eff) - 1
-    rem = abs(u_eff - d_eff)
-    more_desc = d_eff > u_eff   # target is further from the common ancestor
-
-    if cn == 0 and rem == 0:
-        core = 'brother' if target_sex == 'M' else (
-            'sister' if target_sex == 'F' else 'sibling')
-    elif cn == 0:
-        if more_desc:
-            core = 'nephew' if target_sex == 'M' else (
-                'niece' if target_sex == 'F' else 'niece/nephew')
-        else:
-            core = 'uncle' if target_sex == 'M' else (
-                'aunt' if target_sex == 'F' else 'uncle/aunt')
-        if rem > 1:
-            core = _nth_great(rem - 1) + core
-    else:
-        n_str = _ORDINALS[cn] if cn < len(_ORDINALS) else f'{cn}th'
-        r_str = _REMOVALS.get(rem, f'{rem} times')
-        core = f'{n_str} cousin' + (f' {r_str} removed' if rem else '')
-
-    return core + '-in-law' if (lead_sp or trail_sp) else core
-
-
 # ===========================================================================
 # GUI
 # ===========================================================================
@@ -468,45 +98,8 @@ class DNAMatchFinderApp:
         'medium': {'ui': 10, 'mono': 10},
         'large':  {'ui': 13, 'mono': 12},
     }
-    _THEME_NAMES = ('System', 'Light', 'Dark', 'Blue', 'Green')
-    _THEMES = {
-        'Light': {
-            'ttk': 'clam',
-            'bg': '#f0f2f5', 'fg': '#1a1a1a',
-            'button_bg': '#dde1e7', 'field_bg': '#ffffff',
-            'text_bg': '#ffffff', 'text_fg': '#1a1a1a',
-            'select_bg': '#3d7ec7', 'select_fg': '#ffffff',
-            'heading_bg': '#d0d4db', 'trough': '#c5c9d0',
-            'flag_bg': '#fff4cc', 'link': '#1155bb', 'insert': '#1a1a1a',
-        },
-        'Dark': {
-            'ttk': 'clam',
-            'bg': '#2b2b2b', 'fg': '#d4d4d4',
-            'button_bg': '#404040', 'field_bg': '#3c3c3c',
-            'text_bg': '#1e1e1e', 'text_fg': '#d4d4d4',
-            'select_bg': '#264f78', 'select_fg': '#ffffff',
-            'heading_bg': '#404040', 'trough': '#1e1e1e',
-            'flag_bg': '#3d3000', 'link': '#6bbfff', 'insert': '#d4d4d4',
-        },
-        'Blue': {
-            'ttk': 'clam',
-            'bg': '#d4e4f5', 'fg': '#0a2040',
-            'button_bg': '#b8d0e8', 'field_bg': '#eaf2fb',
-            'text_bg': '#eaf2fb', 'text_fg': '#0a2040',
-            'select_bg': '#1a5c9a', 'select_fg': '#ffffff',
-            'heading_bg': '#b0c8e0', 'trough': '#a8c0d8',
-            'flag_bg': '#fffacc', 'link': '#004499', 'insert': '#0a2040',
-        },
-        'Green': {
-            'ttk': 'clam',
-            'bg': '#d0ebd0', 'fg': '#0a2a0a',
-            'button_bg': '#b8d8b8', 'field_bg': '#e8f5e8',
-            'text_bg': '#e8f5e8', 'text_fg': '#0a2a0a',
-            'select_bg': '#2a6a2a', 'select_fg': '#ffffff',
-            'heading_bg': '#a8c8a8', 'trough': '#a0c0a0',
-            'flag_bg': '#fffacc', 'link': '#005500', 'insert': '#0a2a0a',
-        },
-    }
+    _THEME_NAMES = THEME_NAMES
+    _THEMES = THEMES
 
     def __init__(self, root):
         """Initialize application state, preferences, data model, and widgets."""
@@ -631,9 +224,6 @@ class DNAMatchFinderApp:
         self.browse_btn = ttk.Button(file_frame, text=BTN_BROWSE,
                                      command=self._browse)
         self.browse_btn.pack(side='left', padx=2)
-        self.load_btn = ttk.Button(file_frame, text=BTN_LOAD,
-                                   command=self._load_file)
-        self.load_btn.pack(side='left', padx=2)
 
         # Settings row
         settings_frame = ttk.LabelFrame(
@@ -810,8 +400,7 @@ class DNAMatchFinderApp:
         """Disable or re-enable the controls that trigger long operations."""
         self._busy = busy
         state = 'disabled' if busy else 'normal'
-        for widget in (self.load_btn, self.browse_btn,
-                       self.path_combo, self.find_matches_btn):
+        for widget in (self.browse_btn, self.path_combo, self.find_matches_btn):
             widget.configure(state=state)
 
     # ---------------------------------------------------------- Handlers
@@ -2513,15 +2102,15 @@ class DNAMatchFinderApp:
                 text._link_count = 0
                 _set_state(True)
                 text.delete('1.0', 'end')
-                self._render_markdown(
-                    text, new_content, url_handler=_nav_handler)
+                render_markdown(
+                    text, new_content, self._link_color, url_handler=_nav_handler)
                 _set_state(False)
                 text.yview_moveto(0)
             else:
                 webbrowser.open(url)
 
         if markdown:
-            self._render_markdown(text, content, url_handler=_nav_handler)
+            render_markdown(text, content, self._link_color, url_handler=_nav_handler)
         else:
             text.insert('1.0', content)
 
@@ -2547,194 +2136,6 @@ class DNAMatchFinderApp:
         win.lift()
         win.focus_set()
 
-    def _render_markdown(self, widget, content, url_handler=None):
-        """Render basic markdown into a tkinter Text widget using tag formatting."""
-        base = tkfont.Font(font=widget.cget('font'))
-        info = base.actual()
-        family = info['family']
-        size = abs(info['size']) or 10
-        mono = 'Menlo' if sys.platform == 'darwin' else 'Courier'
-
-        widget.tag_configure('h1', font=(
-            family, size + 7, 'bold'), spacing1=10, spacing3=5)
-        widget.tag_configure('h2', font=(
-            family, size + 4, 'bold'), spacing1=8, spacing3=4)
-        widget.tag_configure('h3', font=(
-            family, size + 2, 'bold'), spacing1=6, spacing3=3)
-        widget.tag_configure('bold', font=(family, size, 'bold'))
-        widget.tag_configure('italic', font=(family, size, 'italic'))
-        widget.tag_configure('code_inline', font=(
-            mono, size - 1), background='#f0f0f0')
-        widget.tag_configure('code_block', font=(mono, size - 1), background='#f0f0f0',
-                             lmargin1=16, lmargin2=16, spacing1=1, spacing3=1)
-        widget.tag_configure('link', foreground=self._link_color)
-        widget.tag_configure('bullet', lmargin1=16, lmargin2=32)
-        widget.tag_configure('normal', font=(family, size))
-        widget.tag_configure('table_cell', font=(mono, size - 1))
-        widget.tag_configure('table_bold', font=(mono, size - 1, 'bold'))
-
-        lines = content.split('\n')
-
-        # Pre-scan: compute max visual column widths across all table rows
-        _col_widths: list = []
-        for _ln in lines:
-            _s = _ln.strip()
-            if (_s.startswith('|') and _s.endswith('|')
-                    and not re.match(r'^\|[\s\-:|]+\|$', _s)):
-                _cells = [c.strip() for c in _s[1:-1].split('|')]
-                for _j, _cell in enumerate(_cells):
-                    _vl = _visual_len(_cell)
-                    if _j >= len(_col_widths):
-                        _col_widths.append(_vl)
-                    else:
-                        _col_widths[_j] = max(_col_widths[_j], _vl)
-        # Divider width: │ sp col sp │ sp col sp │ …  = sum(widths) + 3*n + 1
-        _divider_width = (sum(_col_widths) + 3 * len(_col_widths) + 1
-                          if _col_widths else 64)
-
-        i = 0
-        in_code = False
-        code_acc = []
-
-        while i < len(lines):
-            line = lines[i]
-            stripped = line.strip()
-
-            # Fenced code block toggle
-            if stripped.startswith('```'):
-                if in_code:
-                    widget.insert('end', '\n'.join(
-                        code_acc) + '\n', 'code_block')
-                    code_acc = []
-                    in_code = False
-                else:
-                    in_code = True
-                i += 1
-                continue
-
-            if in_code:
-                code_acc.append(line)
-                i += 1
-                continue
-
-            # ASCII-art table border row (+---+---+ or +===+===+)
-            if re.match(r'^\+[-=+]+\+$', stripped):
-                widget.insert('end', '─' * _divider_width + '\n', 'table_cell')
-                i += 1
-                continue
-
-            # GFM table separator row – skip
-            if re.match(r'^\|[\s\-:|]+\|$', stripped):
-                i += 1
-                continue
-
-            # ATX headers (up to ###)
-            hm = re.match(r'^(#{1,3})\s+(.*)', stripped)
-            if hm:
-                self._insert_inline(widget, hm.group(
-                    2), 'h' + str(len(hm.group(1))), url_handler=url_handler)
-                widget.insert('end', '\n')
-                i += 1
-                continue
-
-            # Horizontal rule
-            if re.match(r'^[-*_]{3,}\s*$', stripped):
-                widget.insert('end', '─' * 64 + '\n', 'normal')
-                i += 1
-                continue
-
-            # Table row
-            if stripped.startswith('|') and stripped.endswith('|'):
-                cells = [c.strip() for c in stripped[1:-1].split('|')]
-                next_line = lines[i + 1].strip() if i + 1 < len(lines) else ''
-                is_header = bool(
-                    re.match(r'^\|[\s\-:|]+\|$', next_line) or
-                    re.match(r'^\+[=+]+\+$', next_line)
-                )
-                base_tag = 'table_bold' if is_header else 'table_cell'
-                widget.insert('end', '│ ', base_tag)
-                for j, cell in enumerate(cells):
-                    self._insert_inline(
-                        widget, cell, base_tag, bold_tag='table_bold', url_handler=url_handler)
-                    pad = (_col_widths[j] - _visual_len(cell)
-                           if j < len(_col_widths) else 0)
-                    suffix = ' ' * max(0, pad) + ' │'
-                    if j < len(cells) - 1:
-                        suffix += ' '
-                    widget.insert('end', suffix, base_tag)
-                widget.insert('end', '\n')
-                i += 1
-                continue
-
-            # Bullet list
-            bm = re.match(r'^[-*+]\s+(.*)', stripped)
-            if bm:
-                self._insert_inline(widget, '• ' + bm.group(1),
-                                    'bullet', url_handler=url_handler)
-                widget.insert('end', '\n')
-                i += 1
-                continue
-
-            # Numbered list
-            nm = re.match(r'^(\d+\.)\s+(.*)', stripped)
-            if nm:
-                self._insert_inline(widget, nm.group(
-                    1) + ' ' + nm.group(2), 'bullet', url_handler=url_handler)
-                widget.insert('end', '\n')
-                i += 1
-                continue
-
-            # Empty line
-            if not stripped:
-                widget.insert('end', '\n')
-                i += 1
-                continue
-
-            # Normal paragraph line
-            self._insert_inline(widget, line, 'normal',
-                                url_handler=url_handler)
-            widget.insert('end', '\n')
-            i += 1
-
-        if code_acc:
-            widget.insert('end', '\n'.join(code_acc) + '\n', 'code_block')
-
-    def _insert_inline(self, widget, text, base_tag, bold_tag='bold', url_handler=None):
-        """Insert text with inline markdown (bold, italic, code, links) into widget."""
-        pos = 0
-        for m in _INLINE_RE.finditer(text):
-            if m.start() > pos:
-                widget.insert('end', text[pos:m.start()], base_tag)
-            g1, g2, g3, g4, g5 = m.group(1), m.group(
-                2), m.group(3), m.group(4), m.group(5)
-            if g1 is not None:
-                url = g2
-                lc = getattr(widget, '_link_count', 0)
-                widget._link_count = lc + 1
-                tag = f'_url_{lc}'
-                _open = url_handler if url_handler is not None else webbrowser.open
-                widget.tag_configure(
-                    tag, foreground=self._link_color, underline=True)
-                widget.tag_bind(tag, '<Button-1>', lambda _,
-                                u=url, h=_open: h(u))
-                widget.tag_bind(
-                    tag, '<Enter>', lambda _: widget.config(cursor='hand2'))
-                widget.tag_bind(
-                    tag, '<Leave>', lambda _: widget.config(cursor=''))
-                if not hasattr(widget, '_url_tags'):
-                    widget._url_tags = {}
-                widget._url_tags[tag] = url
-                widget.insert('end', g1, (base_tag, tag))
-            elif g3 is not None:
-                widget.insert('end', g3, (base_tag, bold_tag))
-            elif g4 is not None:
-                widget.insert('end', g4, (base_tag, 'italic'))
-            elif g5 is not None:
-                widget.insert('end', g5, 'code_inline')
-            # else: image – discard silently
-            pos = m.end()
-        if pos < len(text):
-            widget.insert('end', text[pos:], base_tag)
 
 
 def main():
