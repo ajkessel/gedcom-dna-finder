@@ -1,0 +1,789 @@
+"""
+gedcom_gui_dialogs.py
+
+DialogsMixin — person detail, tag picker, person picker, path finder,
+preferences, and documentation windows for DNAMatchFinderApp.
+"""
+
+import tkinter as tk
+import tkinter.font as tkfont
+from tkinter import ttk, messagebox, scrolledtext
+import os
+import sys
+import threading
+import webbrowser
+from gedcom_core import bfs_find_all_paths, describe
+from gedcom_relationship import (
+    _extract_event, get_ancestor_depths, get_descendant_depths,
+    describe_relationship,
+)
+from gedcom_markdown import render_markdown
+from gedcom_strings import *  # noqa: F401,F403
+from gedcom_theme import Tooltip
+
+
+class DialogsMixin:
+    """Mixin providing dialog and documentation window methods."""
+
+    def _show_person(self):
+        """Open the GEDCOM record viewer for the selected person."""
+        if not self.individuals:
+            messagebox.showwarning(ERR_NO_DATA_TITLE, ERR_NO_DATA_MSG)
+            return
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showwarning(ERR_NO_SEL_TITLE, ERR_NO_SEL_MSG)
+            return
+        self._show_person_for(sel[0])
+
+    def _show_person_for(self, indi_id):
+        """Open a detail window for a specific individual ID."""
+        win = tk.Toplevel(self.root)
+        win.geometry(self._show_person_geometry or "700x520")
+        win.minsize(400, 300)
+        win.focus_force()
+
+        _geo_after = [None]
+
+        def _on_win_configure(event):
+            if event.widget is not win:
+                return
+            if _geo_after[0]:
+                win.after_cancel(_geo_after[0])
+            _geo_after[0] = win.after(
+                400, lambda: self._persist_show_person_geometry(win))
+
+        win.bind('<Configure>', _on_win_configure)
+        win.bind('<Escape>', lambda _: win.destroy())
+        win.bind('<Up>', lambda _: text.yview_scroll(-1, 'units') or 'break')
+        win.bind('<Down>', lambda _: text.yview_scroll(1, 'units') or 'break')
+        win.bind('<Prior>', lambda _: text.yview_scroll(-1, 'pages') or 'break')
+        win.bind('<Next>', lambda _: text.yview_scroll(1, 'pages') or 'break')
+        win.bind('<Home>', lambda _: text.yview_moveto(0) or 'break')
+        win.bind('<End>', lambda _: text.yview_moveto(1) or 'break')
+
+        text = scrolledtext.ScrolledText(
+            win, font=self._mono_font, wrap='none', padx=8, pady=8)
+        text.pack(fill='both', expand=True)
+        text.tag_configure('bold', font=self._mono_font_bold)
+        text.tag_configure('person_link')
+        text.tag_bind('person_link', '<Enter>',
+                      lambda _: text.config(cursor='hand2'))
+        text.tag_bind('person_link', '<Leave>',
+                      lambda _: text.config(cursor=''))
+
+        def populate(iid):
+            indi = self.individuals[iid]
+            win.title(WIN_GEDCOM_RECORD.format(name=indi['name'] or iid))
+            text.configure(state='normal')
+            text.delete('1.0', 'end')
+            self._clear_person_tags(text)
+
+            def add(line, bold=False):
+                text.insert('end', line + '\n', ('bold',) if bold else ())
+
+            def person(pid, prefix=''):
+                if prefix:
+                    text.insert('end', prefix)
+                tag = f'pers_{pid.strip("@")}'
+                text.insert('end', describe(self.individuals[pid], show_id=self.show_ids.get()),
+                            ('person_link', tag))
+                text.tag_configure(
+                    tag, foreground=self._link_color)
+                text.tag_bind(tag, '<Button-1>',
+                              lambda _, p=pid: populate(p))
+                text.insert('end', '\n')
+
+            add(BIO_SECTION, bold=True)
+            bio_found = False
+
+            def fmt_event(date, place):
+                parts = [p for p in (date, place) if p]
+                return ', '.join(parts)
+
+            b_date, b_place = _extract_event(indi['_raw'], 'BIRT')
+            if b_date or b_place:
+                bio_found = True
+                add(BIO_BORN.format(event=fmt_event(b_date, b_place)))
+
+            for fam_id in indi['fams']:
+                fam = self.families.get(fam_id)
+                if not fam:
+                    continue
+                m_date = fam.get('marr_date', '')
+                m_place = fam.get('marr_place', '')
+                spouse_id = fam['wife'] if fam['husb'] == iid else fam['husb']
+                spouse_name = (self._display_name(self.individuals[spouse_id])
+                               if spouse_id and spouse_id in self.individuals else '')
+                if spouse_name or m_date or m_place:
+                    bio_found = True
+                    parts = [p for p in (spouse_name, m_date, m_place) if p]
+                    add(BIO_MARRIED.format(spouses=', '.join(parts)))
+
+            d_date, d_place = _extract_event(indi['_raw'], 'DEAT')
+            if d_date or d_place:
+                bio_found = True
+                add(BIO_DIED.format(event=fmt_event(d_date, d_place)))
+
+            bu_date, bu_place = _extract_event(indi['_raw'], 'BURI')
+            if bu_date or bu_place:
+                bio_found = True
+                add(BIO_BURIED.format(event=fmt_event(bu_date, bu_place)))
+
+            if not bio_found:
+                add(BIO_NO_INFO)
+            add("")
+
+            add(FAM_SECTION, bold=True)
+            family_found = False
+
+            parents, siblings, children = self._get_family_members(iid)
+
+            if parents:
+                family_found = True
+                add(FAM_PARENTS)
+                for pid in parents:
+                    person(pid, prefix="    ")
+
+            if siblings:
+                family_found = True
+                add(FAM_SIBLINGS)
+                for sib_id in siblings:
+                    person(sib_id, prefix="    ")
+
+            if children:
+                family_found = True
+                add(FAM_CHILDREN)
+                for child_id in children:
+                    person(child_id, prefix="    ")
+
+            if not family_found:
+                add(FAM_NO_INFO)
+            add("")
+            add(GEDCOM_SECTION, bold=True)
+
+            for level, xref, tag, value in indi.get('_raw', []):
+                parts = [str(level)]
+                if xref and self.show_ids.get():
+                    parts.append(xref)
+                parts.append(tag)
+                if value:
+                    parts.append(value)
+                add(' '.join(parts))
+
+            text.configure(state='disabled')
+
+        populate(indi_id)
+
+        btn_frame = ttk.Frame(win)
+        btn_frame.pack(fill='x', pady=(4, 8))
+        ttk.Button(btn_frame, text=BTN_CLOSE, command=win.destroy).pack(
+            side='right', padx=8)
+        self._apply_theme_to_window(win)
+
+    def _view_tags(self):
+        """Show tag-record definitions and allow choosing the DNA tag keyword."""
+        if not self.tag_records:
+            messagebox.showinfo(WIN_TAG_DEFINITIONS, MSG_NO_TAGS)
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title(WIN_TAG_DEFINITIONS)
+        win.transient(self.root)
+        win.resizable(True, True)
+
+        show_ids = self.show_ids.get()
+        rows = sorted(self.tag_records.items())  # [(ref, name), ...]
+
+        list_frame = ttk.Frame(win, padding=(8, 8, 8, 0))
+        list_frame.pack(fill='both', expand=True)
+
+        if show_ids:
+            tag_tree = ttk.Treeview(list_frame, columns=('id', 'name'),
+                                    show='headings', selectmode='browse',
+                                    height=min(len(rows), 20))
+            tag_tree.heading('id', text=COL_TAG_ID)
+            tag_tree.heading('name', text=COL_TAG_NAME)
+            tag_tree.column('id', width=90, anchor='w', stretch=False)
+            tag_tree.column('name', width=300, anchor='w', stretch=True)
+        else:
+            tag_tree = ttk.Treeview(list_frame, columns=('name',),
+                                    show='headings', selectmode='browse',
+                                    height=min(len(rows), 20))
+            tag_tree.heading('name', text=COL_TAG_NAME)
+            tag_tree.column('name', width=390, anchor='w', stretch=True)
+
+        ysb = ttk.Scrollbar(list_frame, orient='vertical',
+                            command=tag_tree.yview)
+        ysb.configure(takefocus=False)
+        tag_tree.configure(yscrollcommand=ysb.set)
+        tag_tree.pack(side='left', fill='both', expand=True)
+        ysb.pack(side='right', fill='y')
+
+        current_kw = self.tag_keyword.get().strip().lower()
+        first_match = None
+        for ref, name in rows:
+            iid = tag_tree.insert('', 'end',
+                                  values=(ref, name) if show_ids else (name,))
+            if first_match is None and name.strip().lower() == current_kw:
+                first_match = iid
+
+        btn_frame = ttk.Frame(win, padding=(8, 4, 8, 8))
+        btn_frame.pack(fill='x')
+
+        def on_ok():
+            sel = tag_tree.selection()
+            if sel:
+                name_val = tag_tree.set(sel[0], 'name')
+                self.tag_keyword.set(name_val)
+            win.destroy()
+
+        def on_cancel():
+            win.destroy()
+
+        ttk.Button(btn_frame, text=BTN_OK,
+                   command=on_ok).pack(side='right', padx=(4, 0))
+        ttk.Button(btn_frame, text=BTN_CANCEL,
+                   command=on_cancel).pack(side='right')
+
+        tag_tree.bind('<Return>', lambda _: on_ok())
+        tag_tree.bind('<Home>', lambda _: self._tree_jump(
+            'first', tag_tree) or 'break')
+        tag_tree.bind('<End>', lambda _: self._tree_jump(
+            'last',  tag_tree) or 'break')
+        win.bind('<Escape>', lambda _: on_cancel())
+
+        # Size window to fit content, then centre over main window
+        self._center_on_root(win)
+        self._apply_theme_to_window(win)
+
+        win.focus_force()
+        tag_tree.focus_set()
+        target = first_match or (tag_tree.get_children()[
+                                 0] if tag_tree.get_children() else None)
+        if target:
+            tag_tree.focus(target)
+            tag_tree.selection_set(target)
+            tag_tree.see(target)
+
+    def _pick_person(self, title=WIN_SELECT_PERSON):
+        """Modal dialog to pick one person from the loaded GEDCOM. Returns indi_id or None."""
+        if not self.individuals:
+            messagebox.showwarning(ERR_NO_DATA_TITLE, ERR_NO_DATA_MSG)
+            return None
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.focus_force()
+
+        dw, dh = 600, 500
+        self._center_on_root(dialog, dw, dh)
+
+        result = [None]
+
+        search_frame = ttk.Frame(dialog, padding=8)
+        search_frame.pack(fill='x')
+        ttk.Label(search_frame, text=LBL_FIND).pack(side='left', padx=(0, 4))
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=search_var)
+        search_entry.pack(side='left', fill='x', expand=True)
+
+        list_frame = ttk.Frame(dialog, padding=(8, 0, 8, 0))
+        list_frame.pack(fill='both', expand=True)
+
+        picker_tree = ttk.Treeview(
+            list_frame,
+            columns=('name', 'birth', 'death', 'flagged'),
+            show='headings',
+            selectmode='browse',
+        )
+        picker_tree.heading('name', text=COL_NAME)
+        picker_tree.heading('birth', text=COL_BIRTH)
+        picker_tree.heading('death', text=COL_DEATH)
+        picker_tree.heading('flagged', text=COL_DNA)
+        picker_tree.column('name', width=240, anchor='w', stretch=True)
+        picker_tree.column('birth', width=55, anchor='w', stretch=False)
+        picker_tree.column('death', width=55, anchor='w', stretch=False)
+        picker_tree.column('flagged', width=50, anchor='center', stretch=False)
+        picker_tree.tag_configure('flagged_row', background='#fff4cc')
+
+        ysb = ttk.Scrollbar(list_frame, orient='vertical',
+                            command=picker_tree.yview)
+        picker_tree.configure(yscrollcommand=ysb.set)
+        picker_tree.pack(side='left', fill='both', expand=True)
+        ysb.pack(side='right', fill='y')
+
+        after_id = [None]
+
+        def populate(query=''):
+            picker_tree.delete(*picker_tree.get_children())
+            query_l = query.strip().lower()
+            query_tokens = query_l.split()
+            shown = 0
+            for indi_id in self.sorted_ids:
+                indi = self.individuals[indi_id]
+                if query_tokens:
+                    all_names = indi['alt_names'] or [indi['name']]
+                    if not (
+                        any(all(tok in name.lower() for tok in query_tokens)
+                            for name in all_names)
+                        or query_l in indi_id.lower()
+                    ):
+                        continue
+                tags = ('flagged_row',) if indi['dna_markers'] else ()
+                flagged_mark = '✓' if indi['dna_markers'] else ''
+                picker_tree.insert(
+                    '', 'end', iid=indi_id,
+                    values=(self._display_name(indi),
+                            indi['birth_year'] or '',
+                            indi['death_year'] or '',
+                            flagged_mark),
+                    tags=tags,
+                )
+                shown += 1
+                if shown >= self.MAX_LIST_DISPLAY:
+                    break
+
+        def on_search_change(*_):
+            if after_id[0]:
+                dialog.after_cancel(after_id[0])
+            after_id[0] = dialog.after(150, lambda: populate(search_var.get()))
+
+        def picker_flush_and_jump():
+            if after_id[0]:
+                dialog.after_cancel(after_id[0])
+                after_id[0] = None
+                populate(search_var.get())
+            self._tree_jump('first', picker_tree)
+
+        search_var.trace_add('write', on_search_change)
+        search_entry.bind('<Return>', lambda _: picker_flush_and_jump())
+        populate()
+        search_entry.focus_set()
+
+        def select():
+            sel = picker_tree.selection()
+            if sel:
+                result[0] = sel[0]
+            dialog.destroy()
+
+        picker_tree.bind('<Double-1>', lambda e: select())
+        picker_tree.bind('<Return>', lambda e: select())
+        picker_tree.bind(
+            '<Key>', lambda e: self._tree_type_ahead(e, picker_tree))
+        picker_tree.bind('<Home>', lambda _: self._tree_jump(
+            'first', picker_tree) or 'break')
+        picker_tree.bind('<End>', lambda _: self._tree_jump(
+            'last',  picker_tree) or 'break')
+        dialog.bind('<Escape>', lambda _: dialog.destroy())
+
+        btn_frame = ttk.Frame(dialog, padding=8)
+        btn_frame.pack(fill='x')
+        ttk.Button(btn_frame, text=BTN_SELECT, command=select).pack(
+            side='right', padx=(4, 0))
+        ttk.Button(btn_frame, text=BTN_CANCEL,
+                   command=dialog.destroy).pack(side='right')
+
+        self._apply_theme_to_window(dialog)
+        dialog.wait_window()
+        return result[0]
+
+    def _find_path(self):
+        """Prompt for a target person and render paths from the current selection."""
+        if self._busy:
+            return
+        sel = self.tree.selection()
+        if not sel:
+            messagebox.showwarning(ERR_NO_SEL_TITLE, ERR_NO_PATH_SEL_MSG)
+            return
+        start_id = sel[0]
+
+        target_id = self._pick_person(WIN_SELECT_TARGET)
+        if not target_id:
+            return
+
+        try:
+            max_depth = int(self.max_depth.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror(ERR_BAD_VAL_TITLE, ERR_BAD_VAL_DEPTH)
+            return
+
+        try:
+            top_n = int(self.top_n.get())
+        except (tk.TclError, ValueError):
+            top_n = 5
+
+        self._show_progress()
+        self._set_busy(True)
+
+        def _do_search():
+            try:
+                paths, truncated = self._model.find_all_paths(
+                    start_id, target_id, top_n, max_depth)
+                self.root.after(0, lambda: _on_done(paths, truncated, None))
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                self.root.after(0, lambda: _on_done(None, None, e))
+
+        def _on_done(paths, truncated, error):
+            self._hide_progress()
+            self._set_busy(False)
+            if error:
+                messagebox.showerror(ERR_PARSE_TITLE, str(error))
+                return
+            self._last_result = {'type': 'path',
+                                 'start_id': start_id, 'end_id': target_id}
+            self._render_path_results(start_id, target_id, paths, truncated)
+
+        threading.Thread(target=_do_search, daemon=True).start()
+
+    def _render_path_results(self, start_id, end_id, paths, truncated=False):
+        """Render relationship paths between two selected individuals."""
+        w = self.results
+        w.configure(state='normal')
+        w.delete('1.0', 'end')
+        self._clear_person_tags(w)
+
+        w.tag_configure('person_link')
+        w.tag_bind('person_link', '<Enter>',
+                   lambda _: w.config(cursor='hand2'))
+        w.tag_bind('person_link', '<Leave>', lambda _: w.config(cursor=''))
+
+        def nl(text='', bold=False):
+            w.insert('end', text + '\n', ('bold',) if bold else ())
+
+        def person(indi_id, prefix='', suffix=''):
+            if prefix:
+                w.insert('end', prefix)
+            tag = f'pers_{indi_id.strip("@")}'
+            w.insert('end', describe(self.individuals[indi_id], show_id=self.show_ids.get()),
+                     ('person_link', tag))
+            w.tag_configure(tag, foreground=self._link_color)
+            w.tag_bind(tag, '<Button-1>',
+                       lambda _, iid=indi_id: self._navigate_to(iid))
+            if suffix:
+                w.insert('end', suffix)
+            w.insert('end', '\n')
+
+        nl(PATH_SECTION, bold=True)
+        person(start_id, prefix=PATH_FROM)
+        person(end_id,   prefix=PATH_TO)
+        nl()
+
+        if start_id == end_id:
+            nl(PATH_SAME_PERSON)
+        elif not paths:
+            nl(PATH_NOT_FOUND.format(depth=self.max_depth.get()))
+        else:
+            ancestors = get_ancestor_depths(
+                start_id, self.individuals, self.families)
+            descendants = get_descendant_depths(
+                start_id, self.individuals, self.families)
+            for rank, path in enumerate(paths, 1):
+                dist = len(path) - 1
+                rel = describe_relationship(path, self.individuals,
+                                            ancestors=ancestors, descendants=descendants)
+                nl(PATH_RANK.format(
+                    rank=rank, rel=rel, dist=dist,
+                    plural='s' if dist != 1 else ''), bold=True)
+                for i, (node_id, edge) in enumerate(path):
+                    if i == 0:
+                        person(node_id, prefix="  ")
+                    else:
+                        person(node_id, prefix=PATH_EDGE.format(edge=edge))
+                nl()
+            if truncated:
+                nl(PATH_SEARCH_CAP)
+        nl()
+
+        w.configure(state='disabled')
+
+    def _show_preferences(self):
+        """Open the preferences dialog for display, search, and cache settings."""
+        original_font = self._font_size_pref
+        original_theme = self._theme_pref
+        original_top_n = self.top_n.get()
+        original_max_depth = self.max_depth.get()
+        original_fuzzy_threshold = self.fuzzy_threshold.get()
+
+        win = tk.Toplevel(self.root)
+        win.title(WIN_PREFERENCES)
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.grab_set()
+        win.withdraw()  # hide until sized; avoids a flicker at the wrong size
+
+        outer = ttk.Frame(win, padding=16)
+        outer.pack(fill='both', expand=True)
+
+        font_frame = ttk.LabelFrame(
+            outer, text=FRAME_FONT_SIZE, padding=(12, 6))
+        font_frame.pack(fill='x', pady=(0, 8))
+
+        size_var = tk.StringVar(value=self._font_size_pref)
+
+        def on_font_change():
+            self._apply_font_size(size_var.get())
+
+        for label, key in ((FONT_SMALL, "small"), (FONT_MEDIUM, "medium"), (FONT_LARGE, "large")):
+            ttk.Radiobutton(
+                font_frame, text=label, variable=size_var, value=key,
+                command=on_font_change,
+            ).pack(side='left', padx=8)
+
+        theme_frame = ttk.LabelFrame(outer, text=FRAME_THEME, padding=(12, 6))
+        theme_frame.pack(fill='x', pady=(0, 8))
+
+        theme_var = tk.StringVar(value=self._theme_pref)
+
+        def on_theme_change():
+            self._apply_theme(theme_var.get())
+
+        for name in self._THEME_NAMES:
+            ttk.Radiobutton(
+                theme_frame, text=name, variable=theme_var, value=name,
+                command=on_theme_change,
+            ).pack(side='left', padx=6)
+
+        search_frame = ttk.LabelFrame(
+            outer, text=FRAME_SEARCH_DEFAULTS, padding=(12, 6))
+        search_frame.pack(fill='x', pady=(0, 8))
+
+        _pref_top_n_label = ttk.Label(search_frame, text=LBL_TOP_N_RESULTS)
+        _pref_top_n_label.grid(row=0, column=0, sticky='w', padx=(0, 8))
+        top_n_var = tk.IntVar(value=self.top_n.get())
+        _pref_top_n_spin = ttk.Spinbox(
+            search_frame, from_=1, to=20, textvariable=top_n_var, width=6)
+        _pref_top_n_spin.grid(row=0, column=1, sticky='w', padx=(0, 24))
+        Tooltip(_pref_top_n_label, TIP_TOP_N)
+        Tooltip(_pref_top_n_spin, TIP_TOP_N)
+        _pref_max_depth_label = ttk.Label(
+            search_frame, text=LBL_MAX_DEPTH_PREF)
+        _pref_max_depth_label.grid(row=0, column=2, sticky='w', padx=(0, 8))
+        max_depth_var = tk.IntVar(value=self.max_depth.get())
+        _pref_max_depth_spin = ttk.Spinbox(
+            search_frame, from_=1, to=200, textvariable=max_depth_var, width=6)
+        _pref_max_depth_spin.grid(row=0, column=3, sticky='w')
+        Tooltip(_pref_max_depth_label, TIP_MAX_DEPTH)
+        Tooltip(_pref_max_depth_spin, TIP_MAX_DEPTH)
+        _pref_fuzzy_threshold_label = ttk.Label(
+            search_frame, text=LBL_FUZZY_THRESHOLD)
+        _pref_fuzzy_threshold_label.grid(
+            row=1, column=0, sticky='w', padx=(0, 8), pady=(6, 0))
+        fuzzy_threshold_var = tk.DoubleVar(
+            value=round(float(self.fuzzy_threshold.get()), 2))
+        _pref_fuzzy_threshold_spin = ttk.Spinbox(
+            search_frame, from_=0.0, to=1.0, increment=0.01,
+            textvariable=fuzzy_threshold_var, width=6, format="%.2f")
+        _pref_fuzzy_threshold_spin.grid(
+            row=1, column=1, sticky='w', pady=(6, 0))
+        Tooltip(_pref_fuzzy_threshold_label, TIP_FUZZY_THRESHOLD)
+        Tooltip(_pref_fuzzy_threshold_spin, TIP_FUZZY_THRESHOLD)
+
+        display_frame = ttk.LabelFrame(
+            outer, text=FRAME_DISPLAY, padding=(12, 6))
+        display_frame.pack(fill='x', pady=(0, 8))
+        show_ids_var = tk.BooleanVar(value=self.show_ids.get())
+        ttk.Checkbutton(display_frame, text=CHK_SHOW_IDS,
+                        variable=show_ids_var).pack(anchor='w', padx=8)
+
+        name_order_row = ttk.Frame(display_frame)
+        name_order_row.pack(anchor='w', padx=8, pady=(4, 0))
+        ttk.Label(name_order_row, text=LBL_NAME_FORMAT).pack(
+            side='left', padx=(0, 8))
+        name_order_var = tk.StringVar(value=self._name_order)
+        ttk.Radiobutton(name_order_row, text=NAME_FIRST_LAST,
+                        variable=name_order_var, value='first_last').pack(side='left', padx=(0, 8))
+        ttk.Radiobutton(name_order_row, text=NAME_LAST_FIRST,
+                        variable=name_order_var, value='last_first').pack(side='left')
+
+        cache_frame = ttk.LabelFrame(outer, text=FRAME_CACHE, padding=(12, 6))
+        cache_frame.pack(fill='x', pady=(0, 8))
+        ttk.Button(cache_frame, text=BTN_CLEAR_CACHE,
+                   command=self._clear_cache).pack(side='left')
+        ttk.Label(cache_frame, text=LBL_CACHE_NOTE).pack(
+            side='left', padx=(10, 0))
+
+        btn_frame = ttk.Frame(outer)
+        btn_frame.pack(fill='x', pady=(8, 0))
+
+        def on_ok():
+            self._font_size_pref = size_var.get()
+            self._save_font_preference(self._font_size_pref)
+            self._save_theme_preference(theme_var.get())
+            try:
+                self.top_n.set(max(1, int(top_n_var.get())))
+                self._config.set_top_n(self.top_n.get())
+            except (tk.TclError, ValueError):
+                pass
+            try:
+                self.max_depth.set(max(1, int(max_depth_var.get())))
+                self._config.set_max_depth(self.max_depth.get())
+            except (tk.TclError, ValueError):
+                pass
+            try:
+                threshold = min(
+                    1.0, max(0.0, float(fuzzy_threshold_var.get())))
+                self.fuzzy_threshold.set(threshold)
+                self._config.set_fuzzy_threshold(threshold)
+            except (tk.TclError, ValueError):
+                pass
+            self.show_ids.set(show_ids_var.get())
+            self._config.set_show_ids(show_ids_var.get())
+            self._name_order = name_order_var.get()
+            self._config.set_name_order(self._name_order)
+            self._populate_tree()
+            self._refresh_result()
+            win.destroy()
+
+        def on_cancel():
+            self._apply_font_size(original_font)
+            self._apply_theme(original_theme)
+            self.top_n.set(original_top_n)
+            self.max_depth.set(original_max_depth)
+            self.fuzzy_threshold.set(original_fuzzy_threshold)
+            win.destroy()
+
+        win.bind('<Escape>', lambda _: on_cancel())
+        win.bind('<Return>', lambda _: on_ok())
+
+        ttk.Button(btn_frame, text=BTN_OK, command=on_ok).pack(
+            side='right', padx=(4, 0))
+        ttk.Button(btn_frame, text=BTN_CANCEL,
+                   command=on_cancel).pack(side='right')
+
+        # Size and centre after all widgets are built so the window fits
+        # whatever font is currently active (small / medium / large).
+        self._center_on_root(win)
+        self._apply_theme_to_window(win)
+        win.deiconify()
+
+    def _resource_path(self, filename):
+        """Locate a bundled resource whether running from source or PyInstaller."""
+        if getattr(sys, 'frozen', False):
+            base = sys._MEIPASS
+        else:
+            # Assume resources are in the parent directory of the script
+            # (e.g. in a 'resources' folder), for source version only
+            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base, filename)
+
+    def _show_how_to_use(self):
+        """Open the help documentation window."""
+        self._show_file_window(
+            WIN_HOW_TO_USE, self._resource_path('docs/HELP.md'), markdown=True)
+
+    def _show_keyboard_shortcuts(self):
+        """Open the keyboard shortcuts documentation window."""
+        self._show_file_window(
+            WIN_KEYBOARD_SHORTCUTS,
+            self._resource_path('docs/KEYBOARD_SHORTCUTS.md'), markdown=True)
+
+    def _show_about(self):
+        """Open the about window with version and license information."""
+        self._show_file_window(
+            WIN_ABOUT,
+            self._resource_path('docs/LICENSE.md'), markdown=True,
+            preamble=f"# {APP_TITLE}  v{self._version} ({self._release_date})\n\n",
+        )
+
+    def _show_privacy_policy(self):
+        """Open the privacy policy documentation window."""
+        self._show_file_window(
+            WIN_PRIVACY_POLICY,
+            self._resource_path('docs/PRIVACY_POLICY.md'), markdown=True,
+        )
+
+    def _show_file_window(self, title, filepath, markdown=False, preamble=""):
+        """Open a modal text window for a bundled documentation file."""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = preamble + f.read()
+        except OSError as e:
+            messagebox.showerror(
+                ERR_FILE_NOT_FOUND_TITLE,
+                ERR_FILE_NOT_FOUND_MSG.format(path=filepath, error=e))
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title(title)
+        win.minsize(500, 300)
+        win.transient(self.root)
+        win.grab_set()
+        win.bind('<Escape>', lambda _: win.destroy())
+        dw, dh = 820, 640
+        self._center_on_root(win, dw, dh)
+
+        text_frame = ttk.Frame(win)
+        text_frame.pack(fill='both', expand=True)
+        vsb = ttk.Scrollbar(text_frame, orient='vertical')
+        text = tk.Text(text_frame, wrap='word', padx=12, pady=8,
+                       relief='flat', borderwidth=0, font='TkTextFont',
+                       yscrollcommand=vsb.set)
+        vsb.configure(command=text.yview)
+        vsb.pack(side='right', fill='y')
+        text.pack(side='left', fill='both', expand=True)
+
+        base_dir = os.path.dirname(os.path.abspath(filepath))
+
+        def _set_state(enabled):
+            if sys.platform == 'darwin':
+                if enabled:
+                    text.unbind('<Key>')
+                else:
+                    text.bind('<Key>', lambda e: 'break')
+            else:
+                text.configure(state='normal' if enabled else 'disabled')
+
+        def _nav_handler(url):
+            if not url.startswith(('http://', 'https://')) and url.endswith('.md'):
+                target = os.path.normpath(os.path.join(base_dir, url))
+                try:
+                    with open(target, 'r', encoding='utf-8') as f:
+                        new_content = f.read()
+                except OSError:
+                    webbrowser.open(url)
+                    return
+                win.title(os.path.splitext(os.path.basename(target))[0]
+                          .replace('_', ' ').title())
+                for tag in list(text.tag_names()):
+                    if tag.startswith('_url_'):
+                        text.tag_delete(tag)
+                text._link_count = 0
+                _set_state(True)
+                text.delete('1.0', 'end')
+                render_markdown(
+                    text, new_content, self._link_color, url_handler=_nav_handler)
+                _set_state(False)
+                text.yview_moveto(0)
+            else:
+                webbrowser.open(url)
+
+        if markdown:
+            render_markdown(text, content, self._link_color, url_handler=_nav_handler)
+        else:
+            text.insert('1.0', content)
+
+        if sys.platform == 'darwin':
+            # On macOS Aqua, state='disabled' blocks all mouse events including
+            # tag_bind clicks, so keep the widget editable and block key input instead.
+            text.bind('<Key>', lambda e: 'break')
+        else:
+            text.configure(state='disabled')
+        ttk.Separator(win, orient='horizontal').pack(fill='x')
+        btn_frame = ttk.Frame(win)
+        btn_frame.pack(fill='x', padx=12, pady=8)
+        ttk.Button(btn_frame, text=BTN_CLOSE,
+                   command=win.destroy).pack(side='right')
+
+        win.bind('<Up>', lambda _: text.yview_scroll(-1, 'units') or 'break')
+        win.bind('<Down>', lambda _: text.yview_scroll(1, 'units') or 'break')
+        win.bind('<Prior>', lambda _: text.yview_scroll(-1, 'pages') or 'break')
+        win.bind('<Next>', lambda _: text.yview_scroll(1, 'pages') or 'break')
+        win.bind('<Home>', lambda _: text.yview_moveto(0) or 'break')
+        win.bind('<End>', lambda _: text.yview_moveto(1) or 'break')
+
+        self._apply_theme_to_window(win)
+        win.lift()
+        win.focus_set()

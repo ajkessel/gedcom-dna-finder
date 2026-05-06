@@ -22,7 +22,7 @@ def _detect_system_theme():
             return 'Light'
     elif sys.platform == 'win32':
         try:
-            import winreg
+            import winreg # pylint: disable=import-outside-toplevel
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 r'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize',
@@ -40,7 +40,7 @@ def _detect_system_theme():
                 capture_output=True, text=True,
             )
             return 'Dark' if 'dark' in result.stdout.lower() else 'Light'
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             return 'Light'
 
 

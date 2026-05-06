@@ -7,8 +7,8 @@ class; callers pass link_color explicitly.
 
 import re
 import sys
-import tkinter as tk
 import webbrowser
+import tkinter as tk
 import tkinter.font as tkfont
 
 
@@ -50,7 +50,7 @@ def _insert_hr(widget):
                 try:
                     c.configure(width=usable)
                     c.coords(lid, 0, 5, usable, 5)
-                except Exception:
+                except Exception: # pylint: disable=broad-exception-caught
                     pass
 
         widget.bind('<Configure>', _on_resize)

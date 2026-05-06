@@ -23,11 +23,19 @@ on Linux you may need a python3-tk package).
 """
 
 import tkinter.font as tkfont
+import argparse
+import difflib
+import os
+import re
+import subprocess
+import sys
+import threading
+import webbrowser
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import tkinter as tk
 from gedcom_data_model import GedcomDataModel
 from gedcom_config import ConfigManager
-from gedcom_strings import *  # user-facing strings noqa: F401,F403 # pylint: disable=unused-wildcard-import
+from gedcom_strings import *  # user-facing strings noqa: F401,F403 # pylint: disable=unused-wildcard-import,wildcard-import
 from gedcom_core import (
     bfs_find_dna_matches,
     bfs_find_all_paths,
@@ -42,14 +50,6 @@ from gedcom_relationship import (
 from gedcom_theme import Tooltip, THEME_NAMES, THEMES
 from gedcom_gui_appearance import AppearanceMixin
 from gedcom_gui_dialogs import DialogsMixin
-import argparse
-import difflib
-import os
-import re
-import subprocess
-import sys
-import threading
-import webbrowser
 
 
 def _open_url(url):
@@ -228,7 +228,7 @@ class DNAMatchFinderApp(DialogsMixin, AppearanceMixin):
                                      command=self._browse)
         self.browse_btn.pack(side='left', padx=2)
         Tooltip(self.browse_btn, TIP_BROWSE)
-        
+
         # Settings row
         settings_frame = ttk.LabelFrame(
             outer, text=FRAME_DNA_SETTINGS, padding=8)
