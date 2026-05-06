@@ -78,7 +78,7 @@ class GedcomDataModel:
                     deleted += 1
                 except OSError:
                     pass
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             pass
         return deleted
 
@@ -105,7 +105,7 @@ class GedcomDataModel:
                     or data.get('page_marker') != page_marker):
                 return None
             return data['individuals'], data['families'], data['tag_records']
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             return None
 
     def _save_to_cache(self, gedcom_path, dna_keyword, page_marker, cache_dir):
@@ -126,5 +126,5 @@ class GedcomDataModel:
             with tmp.open('w', encoding='utf-8') as f:
                 json.dump(payload, f)
             tmp.replace(cache_file)
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             pass

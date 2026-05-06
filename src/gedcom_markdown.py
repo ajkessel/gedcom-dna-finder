@@ -7,6 +7,7 @@ class; callers pass link_color explicitly.
 
 import re
 import sys
+import tkinter as tk
 import webbrowser
 import tkinter.font as tkfont
 
@@ -29,6 +30,43 @@ def _visual_len(text):
     t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
     t = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', t)
     return len(t)
+
+
+def _insert_hr(widget):
+    """Embed a canvas horizontal rule that fills and resizes with the widget."""
+    padx = int(widget.cget('padx'))
+    bg = widget.cget('background') or 'white'
+    fg = widget.cget('foreground') or 'gray60'
+
+    canvas = tk.Canvas(widget, height=10, bd=0, highlightthickness=0, bg=bg)
+    line_id = canvas.create_line(0, 5, 10, 5, fill=fg)
+
+    if not hasattr(widget, '_hr_canvases'):
+        widget._hr_canvases = []
+
+        def _on_resize(e):
+            usable = max(10, e.width - 2 * int(widget.cget('padx')))
+            for c, lid in widget._hr_canvases:
+                try:
+                    c.configure(width=usable)
+                    c.coords(lid, 0, 5, usable, 5)
+                except Exception:
+                    pass
+
+        widget.bind('<Configure>', _on_resize)
+
+    widget._hr_canvases.append((canvas, line_id))
+    widget.window_create('end', window=canvas)
+    widget.insert('end', '\n')
+
+    def _init_size():
+        w = widget.winfo_width()
+        if w > 1:
+            usable = max(10, w - 2 * padx)
+            canvas.configure(width=usable)
+            canvas.coords(line_id, 0, 5, usable, 5)
+
+    widget.after(1, _init_size)
 
 
 def render_markdown(widget, content, link_color='#0066cc', url_handler=None):
@@ -121,7 +159,7 @@ def render_markdown(widget, content, link_color='#0066cc', url_handler=None):
 
         # Horizontal rule
         if re.match(r'^[-*_]{3,}\s*$', stripped):
-            widget.insert('end', '─' * 64 + '\n', 'normal')
+            _insert_hr(widget)
             i += 1
             continue
 
@@ -197,7 +235,7 @@ def insert_inline(widget, text, base_tag, link_color='#0066cc',
             widget._link_count = lc + 1
             tag = f'_url_{lc}'
             _open = url_handler if url_handler is not None else webbrowser.open
-            widget.tag_configure(tag, foreground=link_color, underline=True)
+            widget.tag_configure(tag, foreground=link_color)
             widget.tag_bind(tag, '<Button-1>', lambda _, u=url, h=_open: h(u))
             widget.tag_bind(
                 tag, '<Enter>', lambda _: widget.config(cursor='hand2'))

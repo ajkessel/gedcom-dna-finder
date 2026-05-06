@@ -23,6 +23,7 @@ Gedcom
 GEDCOM
 Geni
 gsettings
+highlightthickness
 husb
 HUSB
 indi

@@ -104,24 +104,24 @@ TIP_FUZZY_THRESHOLD = (
 # Show Person window
 # ---------------------------------------------------------------------------
 WIN_GEDCOM_RECORD = "GEDCOM Record: {name}"
-BIO_SECTION = "── Biography ──"
+BIO_SECTION = "Biography"
 BIO_BORN = "  Born:    {event}"
 BIO_MARRIED = "  Married: {spouses}"
 BIO_DIED = "  Died:    {event}"
 BIO_BURIED = "  Buried:  {event}"
 BIO_NO_INFO = "  (no biographical information found)"
-FAM_SECTION = "── Family ──"
+FAM_SECTION = "Family"
 FAM_PARENTS = "  Parents:"
 FAM_SIBLINGS = "  Siblings:"
 FAM_CHILDREN = "  Children:"
 FAM_NO_INFO = "  (no family information found)"
-GEDCOM_SECTION = "── GEDCOM Record ──"
+GEDCOM_SECTION = "Full GEDCOM Record"
 BTN_CLOSE = "Close"
 
 # ---------------------------------------------------------------------------
 # DNA match results display
 # ---------------------------------------------------------------------------
-RESULT_STARTING_FROM = "Starting from: "
+RESULT_STARTING_FROM = "Closest tag matches starting from "
 RESULT_DNA_FLAGGED_NOTE = "  Note: this person is themselves DNA-flagged."
 RESULT_NO_DNA_FOUND = "No DNA-flagged relatives found within the search depth."
 RESULT_RANK_PREFIX = "#{rank}: "
@@ -130,7 +130,7 @@ RESULT_DNA_MARKERS = "   DNA markers:"
 RESULT_RELATIONSHIP = "   Relationship: {rel}"
 RESULT_PATH = "   Path:"
 RESULT_EDGE = "       --[{edge}]--> "
-RESULT_PATH_SECTION = "── Path to Home Person ──"
+RESULT_PATH_SECTION = "Path to Home Person"
 RESULT_HOME = "Home: "
 RESULT_NO_HOME_PATH = "No path found to home person within the current max depth."
 RESULT_HOME_REL = "Relationship: {rel} ({dist} edge{plural})"

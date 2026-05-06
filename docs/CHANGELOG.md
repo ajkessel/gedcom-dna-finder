@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.2] - 2026-05-06
+- Detect system dark/light mode and set theme accordingly
+- Refactor code into smaller modules
+- Removed vestigial "load" button
+
 ## [0.3.1] - 2026-05-05
 
 - Various fixes to improve "look" on MacOS
