@@ -88,7 +88,7 @@ THEMES = {
         'bg': '#f0f2f5', 'fg': '#1a1a1a',
         'button_bg': '#dde1e7', 'field_bg': '#ffffff',
         'text_bg': '#ffffff', 'text_fg': '#1a1a1a',
-        'select_bg': '#3d7ec7', 'select_fg': '#ffffff',
+        'select_bg': '#00ff00', 'select_fg': '#0000ff',
         'heading_bg': '#d0d4db', 'trough': '#c5c9d0',
         'flag_bg': '#fff4cc', 'link': '#1155bb', 'insert': '#1a1a1a',
     },
@@ -102,7 +102,7 @@ THEMES = {
         'flag_bg': '#3d3000', 'link': '#6bbfff', 'insert': '#d4d4d4',
     },
     'Blue': {
-        'ttk': DEFAULT_TTK,
+        'ttk': 'clam',
         'bg': '#d4e4f5', 'fg': '#0a2040',
         'button_bg': '#b8d0e8', 'field_bg': '#eaf2fb',
         'text_bg': '#eaf2fb', 'text_fg': '#0a2040',
@@ -111,7 +111,7 @@ THEMES = {
         'flag_bg': '#fffacc', 'link': '#004499', 'insert': '#0a2040',
     },
     'Green': {
-        'ttk': DEFAULT_TTK,
+        'ttk': 'clam',
         'bg': '#d0ebd0', 'fg': '#0a2a0a',
         'button_bg': '#b8d8b8', 'field_bg': '#e8f5e8',
         'text_bg': '#e8f5e8', 'text_fg': '#0a2a0a',
