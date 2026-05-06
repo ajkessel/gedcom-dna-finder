@@ -45,6 +45,41 @@ import webbrowser
 from collections import deque
 
 
+def _detect_system_theme():
+    """Return 'Dark' or 'Light' based on the OS dark-mode setting."""
+    if sys.platform == 'darwin':
+        try:
+            result = subprocess.run(
+                ['defaults', 'read', '-g', 'AppleInterfaceStyle'],
+                capture_output=True, text=True,
+            )
+            return 'Dark' if result.stdout.strip().lower() == 'dark' else 'Light'
+        except Exception:
+            return 'Light'
+    elif sys.platform == 'win32':
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize',
+            )
+            value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')
+            winreg.CloseKey(key)
+            return 'Light' if value == 1 else 'Dark'
+        except Exception:
+            return 'Light'
+    else:
+        # Linux / other: try the freedesktop color-scheme preference
+        try:
+            result = subprocess.run(
+                ['gsettings', 'get', 'org.gnome.desktop.interface', 'color-scheme'],
+                capture_output=True, text=True,
+            )
+            return 'Dark' if 'dark' in result.stdout.lower() else 'Light'
+        except Exception:
+            return 'Light'
+
+
 def _open_url(url):
     # webbrowser.open() silently fails in PyInstaller .app bundles on macOS
     # because Python routes through osascript, which can break in frozen apps.
@@ -433,7 +468,7 @@ class DNAMatchFinderApp:
         'medium': {'ui': 10, 'mono': 10},
         'large':  {'ui': 13, 'mono': 12},
     }
-    _THEME_NAMES = ('Default', 'Light', 'Dark', 'Blue', 'Green')
+    _THEME_NAMES = ('System', 'Light', 'Dark', 'Blue', 'Green')
     _THEMES = {
         'Light': {
             'ttk': 'clam',
@@ -1085,7 +1120,8 @@ class DNAMatchFinderApp:
 
         def _do_search():
             try:
-                results = self._model.find_dna_matches(start_id, top_n, max_depth)
+                results = self._model.find_dna_matches(
+                    start_id, top_n, max_depth)
                 self.root.after(0, lambda: _on_done(results, None))
             except Exception as e:  # pylint: disable=broad-exception-caught
                 self.root.after(0, lambda: _on_done(None, e))
@@ -1907,7 +1943,9 @@ class DNAMatchFinderApp:
     def _apply_styles(self):
         """Apply the current theme colours + font metrics to the ttk Style engine."""
         style = ttk.Style()
-        t = self._THEMES.get(getattr(self, '_theme_pref', 'Default'))
+        pref = getattr(self, '_theme_pref', 'Default')
+        resolved = _detect_system_theme() if pref == 'System' else pref
+        t = self._THEMES.get(resolved)
 
         if t is None:
             try:
@@ -1966,7 +2004,8 @@ class DNAMatchFinderApp:
     def _apply_theme(self, theme_name):
         """Apply a named color theme to the application."""
         self._theme_pref = theme_name
-        t = self._THEMES.get(theme_name)
+        resolved = _detect_system_theme() if theme_name == 'System' else theme_name
+        t = self._THEMES.get(resolved)
         self._apply_styles()
         self._recolor_all(t)
         if hasattr(self, 'tree'):
@@ -2149,7 +2188,8 @@ class DNAMatchFinderApp:
             except (tk.TclError, ValueError):
                 pass
             try:
-                threshold = min(1.0, max(0.0, float(fuzzy_threshold_var.get())))
+                threshold = min(
+                    1.0, max(0.0, float(fuzzy_threshold_var.get())))
                 self.fuzzy_threshold.set(threshold)
                 self._config.set_fuzzy_threshold(threshold)
             except (tk.TclError, ValueError):
@@ -2199,9 +2239,8 @@ class DNAMatchFinderApp:
             geo = win.geometry()
             self._show_person_geometry = geo
             self._config.set_window_geometry('show_person_geometry', geo)
-        except Exception as e: # pylint: disable=broad-except
+        except Exception as e:  # pylint: disable=broad-except
             print(f"Error persisting show person geometry: {e}")
-            pass
 
     def _set_home_person(self):
         """Save the selected person as the home person for the active GEDCOM."""
@@ -2474,7 +2513,8 @@ class DNAMatchFinderApp:
                 text._link_count = 0
                 _set_state(True)
                 text.delete('1.0', 'end')
-                self._render_markdown(text, new_content, url_handler=_nav_handler)
+                self._render_markdown(
+                    text, new_content, url_handler=_nav_handler)
                 _set_state(False)
                 text.yview_moveto(0)
             else:
@@ -2494,7 +2534,8 @@ class DNAMatchFinderApp:
         ttk.Separator(win, orient='horizontal').pack(fill='x')
         btn_frame = ttk.Frame(win)
         btn_frame.pack(fill='x', padx=12, pady=8)
-        ttk.Button(btn_frame, text=BTN_CLOSE, command=win.destroy).pack(side='right')
+        ttk.Button(btn_frame, text=BTN_CLOSE,
+                   command=win.destroy).pack(side='right')
 
         win.bind('<Up>', lambda _: text.yview_scroll(-1, 'units') or 'break')
         win.bind('<Down>', lambda _: text.yview_scroll(1, 'units') or 'break')
@@ -2628,7 +2669,8 @@ class DNAMatchFinderApp:
             # Bullet list
             bm = re.match(r'^[-*+]\s+(.*)', stripped)
             if bm:
-                self._insert_inline(widget, '• ' + bm.group(1), 'bullet', url_handler=url_handler)
+                self._insert_inline(widget, '• ' + bm.group(1),
+                                    'bullet', url_handler=url_handler)
                 widget.insert('end', '\n')
                 i += 1
                 continue
@@ -2649,7 +2691,8 @@ class DNAMatchFinderApp:
                 continue
 
             # Normal paragraph line
-            self._insert_inline(widget, line, 'normal', url_handler=url_handler)
+            self._insert_inline(widget, line, 'normal',
+                                url_handler=url_handler)
             widget.insert('end', '\n')
             i += 1
 

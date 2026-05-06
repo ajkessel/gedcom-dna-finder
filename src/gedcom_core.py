@@ -84,6 +84,7 @@ def iter_records_checked(path):
 
 
 def extract_year(date_str):
+    """Extract a 3- or 4-digit year from a date string."""
     m = re.search(r'\b(\d{3,4})\b', date_str or '')
     return int(m.group(1)) if m else None
 
@@ -154,7 +155,8 @@ def build_model(gedcom_path, dna_keyword, page_marker):
                         slash_start = value.find('/')
                         slash_end = value.rfind('/')
                         if slash_start != -1 and slash_end > slash_start:
-                            indi['surname'] = value[slash_start + 1:slash_end].strip()
+                            indi['surname'] = value[slash_start +
+                                                    1:slash_end].strip()
                             indi['given_name'] = value[:slash_start].strip()
                         else:
                             indi['given_name'] = cleaned
@@ -322,6 +324,7 @@ def bfs_find_dna_matches(start_id, individuals, families, top_n, max_depth):
 
 
 def lifespan(indi):
+    """Return a string representing the individual's lifespan."""
     b, d = indi.get('birth_year'), indi.get('death_year')
     if b and d:
         return f'{b}-{d}'
@@ -333,6 +336,7 @@ def lifespan(indi):
 
 
 def describe(indi, show_id=True):
+    """Return a string describing the individual, including their name, lifespan, and ID."""
     name = indi['name'] or '(unknown)'
     span = lifespan(indi)
     if show_id:

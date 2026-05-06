@@ -26,14 +26,14 @@ class ConfigManager:
         try:
             data = json.loads(self._path.read_text(encoding='utf-8'))
             return data.get(key, default)
-        except Exception: # pylint: disable=broad-exception-caught
+        except Exception:  # pylint: disable=broad-exception-caught
             return default
 
     def save_value(self, key, value):
         """Persist a single setting value while preserving other saved settings."""
         try:
             data = json.loads(self._path.read_text(encoding='utf-8'))
-        except Exception: # pylint: disable=broad-exception-caught
+        except Exception:  # pylint: disable=broad-exception-caught
             data = {}
         data[key] = value
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -158,5 +158,6 @@ class ConfigManager:
             base = Path.home() / 'Library' / 'Application Support'
         else:
             import os
-            base = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
+            base = Path(os.environ.get(
+                'XDG_CONFIG_HOME', Path.home() / '.config'))
         return base / 'gedcom-dna-finder' / 'settings.json'
