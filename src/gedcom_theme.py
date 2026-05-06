@@ -18,7 +18,7 @@ def _detect_system_theme():
                 capture_output=True, text=True,
             )
             return 'Dark' if result.stdout.strip().lower() == 'dark' else 'Light'
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             return 'Light'
     elif sys.platform == 'win32':
         try:
@@ -30,7 +30,7 @@ def _detect_system_theme():
             value, _ = winreg.QueryValueEx(key, 'AppsUseLightTheme')
             winreg.CloseKey(key)
             return 'Light' if value == 1 else 'Dark'
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             return 'Light'
     else:
         # Linux / other: try the freedesktop color-scheme preference
@@ -77,9 +77,14 @@ class Tooltip:
 
 THEME_NAMES = ('System', 'Light', 'Dark', 'Blue', 'Green')
 
+if sys.platform == 'darwin':
+    DEFAULT_TTK = 'aqua'
+else:
+    DEFAULT_TTK = 'clam'
+
 THEMES = {
     'Light': {
-        'ttk': 'clam',
+        'ttk': DEFAULT_TTK,
         'bg': '#f0f2f5', 'fg': '#1a1a1a',
         'button_bg': '#dde1e7', 'field_bg': '#ffffff',
         'text_bg': '#ffffff', 'text_fg': '#1a1a1a',
@@ -88,7 +93,7 @@ THEMES = {
         'flag_bg': '#fff4cc', 'link': '#1155bb', 'insert': '#1a1a1a',
     },
     'Dark': {
-        'ttk': 'clam',
+        'ttk': DEFAULT_TTK,
         'bg': '#2b2b2b', 'fg': '#d4d4d4',
         'button_bg': '#404040', 'field_bg': '#3c3c3c',
         'text_bg': '#1e1e1e', 'text_fg': '#d4d4d4',
@@ -97,7 +102,7 @@ THEMES = {
         'flag_bg': '#3d3000', 'link': '#6bbfff', 'insert': '#d4d4d4',
     },
     'Blue': {
-        'ttk': 'clam',
+        'ttk': DEFAULT_TTK,
         'bg': '#d4e4f5', 'fg': '#0a2040',
         'button_bg': '#b8d0e8', 'field_bg': '#eaf2fb',
         'text_bg': '#eaf2fb', 'text_fg': '#0a2040',
@@ -106,7 +111,7 @@ THEMES = {
         'flag_bg': '#fffacc', 'link': '#004499', 'insert': '#0a2040',
     },
     'Green': {
-        'ttk': 'clam',
+        'ttk': DEFAULT_TTK,
         'bg': '#d0ebd0', 'fg': '#0a2a0a',
         'button_bg': '#b8d8b8', 'field_bg': '#e8f5e8',
         'text_bg': '#e8f5e8', 'text_fg': '#0a2a0a',
