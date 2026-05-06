@@ -33,7 +33,6 @@ MENU_QUIT = "Quit"
 # ---------------------------------------------------------------------------
 FRAME_GEDCOM_FILE = "GEDCOM file"
 BTN_BROWSE = "Browse…"
-BTN_LOAD = "Load"
 DLG_SELECT_GEDCOM = "Select GEDCOM file"
 
 # ---------------------------------------------------------------------------
@@ -76,6 +75,9 @@ BTN_CLEAR = "Clear"
 # ---------------------------------------------------------------------------
 # Tooltips
 # ---------------------------------------------------------------------------
+TIP_BROWSE = (
+    "Browse to select a GEDCOM file. You can also select a ZIP file containing a GEDCOM."
+)
 TIP_SELECT_TAG = (
     "Select a new tag for finding the path between the selected person"
     " and the closest people with that tag."

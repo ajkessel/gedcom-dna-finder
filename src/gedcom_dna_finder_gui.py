@@ -27,7 +27,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import tkinter as tk
 from gedcom_data_model import GedcomDataModel
 from gedcom_config import ConfigManager
-from gedcom_strings import *  # noqa: F401,F403  (all user-facing strings)
+from gedcom_strings import *  # user-facing strings noqa: F401,F403 # pylint: disable=unused-wildcard-import
 from gedcom_core import (
     bfs_find_dna_matches,
     bfs_find_all_paths,
@@ -35,13 +35,11 @@ from gedcom_core import (
     extract_ged_from_zip,
 )
 from gedcom_relationship import (
-    _extract_event,
     get_ancestor_depths,
     get_descendant_depths,
     describe_relationship,
 )
-from gedcom_markdown import render_markdown
-from gedcom_theme import _detect_system_theme, Tooltip, THEME_NAMES, THEMES
+from gedcom_theme import Tooltip, THEME_NAMES, THEMES
 from gedcom_gui_appearance import AppearanceMixin
 from gedcom_gui_dialogs import DialogsMixin
 import argparse
@@ -229,7 +227,8 @@ class DNAMatchFinderApp(DialogsMixin, AppearanceMixin):
         self.browse_btn = ttk.Button(file_frame, text=BTN_BROWSE,
                                      command=self._browse)
         self.browse_btn.pack(side='left', padx=2)
-
+        Tooltip(self.browse_btn, TIP_BROWSE)
+        
         # Settings row
         settings_frame = ttk.LabelFrame(
             outer, text=FRAME_DNA_SETTINGS, padding=8)
@@ -788,9 +787,6 @@ class DNAMatchFinderApp(DialogsMixin, AppearanceMixin):
                 person(end_id,
                        prefix=RESULT_RANK_PREFIX.format(rank=rank),
                        suffix=RESULT_DISTANCE.format(dist=dist), bold=True)
-                nl(RESULT_DNA_MARKERS)
-                for m in self.individuals[end_id]['dna_markers']:
-                    nl(f"     - {self._format_marker(m)}")
                 rel = describe_relationship(
                     path, self.individuals,
                     ancestors=ancestors, descendants=descendants)
@@ -801,6 +797,9 @@ class DNAMatchFinderApp(DialogsMixin, AppearanceMixin):
                         person(node_id, prefix="     ")
                     else:
                         person(node_id, prefix=RESULT_EDGE.format(edge=edge))
+                nl(RESULT_DNA_MARKERS)
+                for m in self.individuals[end_id]['dna_markers']:
+                    nl(f"     - {self._format_marker(m)}")
                 hr()
 
         # Family section
