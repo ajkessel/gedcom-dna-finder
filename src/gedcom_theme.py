@@ -88,7 +88,7 @@ THEMES = {
         'bg': '#f0f2f5', 'fg': '#1a1a1a',
         'button_bg': '#dde1e7', 'field_bg': '#ffffff',
         'text_bg': '#ffffff', 'text_fg': '#1a1a1a',
-        'select_bg': '#00ff00', 'select_fg': '#0000ff',
+        'select_bg': '#0000ff', 'select_fg': '#0000ff',
         'heading_bg': '#d0d4db', 'trough': '#c5c9d0',
         'flag_bg': '#fff4cc', 'link': '#1155bb', 'insert': '#1a1a1a',
     },
