@@ -10,7 +10,7 @@ import tkinter.font as tkfont
 from tkinter import ttk, messagebox
 import sys
 from gedcom_strings import *  # noqa: F401,F403
-from gedcom_theme import _detect_system_theme, Tooltip, THEME_NAMES, THEMES
+from gedcom_theme import DEFAULT_TTK, Tooltip, THEME_NAMES, THEMES
 
 
 class AppearanceMixin:
@@ -116,12 +116,11 @@ class AppearanceMixin:
         """Apply the current theme colours + font metrics to the ttk Style engine."""
         style = ttk.Style()
         pref = getattr(self, '_theme_pref', 'Default')
-        resolved = _detect_system_theme() if pref == 'System' else pref
-        t = self._THEMES.get(resolved)
+        t = self._THEMES.get(pref)
 
         if t is None:
             try:
-                style.theme_use(self._default_ttk_theme)
+                style.theme_use(DEFAULT_TTK)
             except tk.TclError:
                 pass
         else:
@@ -176,32 +175,52 @@ class AppearanceMixin:
     def _apply_theme(self, theme_name):
         """Apply a named color theme to the application."""
         self._theme_pref = theme_name
-        resolved = _detect_system_theme() if theme_name == 'System' else theme_name
-        t = self._THEMES.get(resolved)
+        t = self._THEMES.get(theme_name)
         self._apply_styles()
         self._recolor_all(t)
         if hasattr(self, 'tree'):
             self.tree.tag_configure(
                 'flagged_row',
-                background=t['flag_bg'] if t else '#fff4cc',
+                background=t['flag_bg'] if t else '',
             )
         if hasattr(self, 'results'):
             self.root.after(0, self._refit_windows)
 
     def _recolor_all(self, theme, start_widget=None):
         """Recolor every tk.Text widget and window background to match theme."""
+        root = start_widget if start_widget is not None else self.root
+
         if theme is None:
-            text_bg, text_fg = 'white', 'black'
-            insert_col = 'black'
-            sel_bg, sel_fg = '#0078d4', 'white'
-            link_col = '#0066cc'
-            root_bg = None
-        else:
-            text_bg, text_fg = theme['text_bg'], theme['text_fg']
-            insert_col = theme['insert']
-            sel_bg, sel_fg = theme['select_bg'], theme['select_fg']
-            link_col = theme['link']
-            root_bg = theme['bg']
+            # System theme: reset Text widgets to platform defaults.
+            self._link_color = '#0066cc'
+
+            def recolor(widget):
+                try:
+                    if isinstance(widget, tk.Text):
+                        widget.configure(
+                            bg='', fg='',
+                            insertbackground='',
+                            selectbackground='',
+                            selectforeground='',
+                        )
+                        if hasattr(widget, 'frame'):
+                            widget.frame.configure(bg='')
+                        for tag in widget.tag_names():
+                            if tag.startswith('pers_'):
+                                widget.tag_configure(tag, foreground=self._link_color)
+                except tk.TclError:
+                    pass
+                for child in widget.winfo_children():
+                    recolor(child)
+
+            recolor(root)
+            return
+
+        text_bg, text_fg = theme['text_bg'], theme['text_fg']
+        insert_col = theme['insert']
+        sel_bg, sel_fg = theme['select_bg'], theme['select_fg']
+        link_col = theme['link']
+        root_bg = theme['bg']
 
         self._link_color = link_col
 
@@ -226,13 +245,12 @@ class AppearanceMixin:
             for child in widget.winfo_children():
                 recolor(child)
 
-        recolor(start_widget if start_widget is not None else self.root)
+        recolor(root)
 
     def _apply_theme_to_window(self, win):
         """Apply the active theme colours to a newly created Toplevel window."""
         pref = getattr(self, '_theme_pref', 'Default')
-        resolved = _detect_system_theme() if pref == 'System' else pref
-        t = self._THEMES.get(resolved)
+        t = self._THEMES.get(pref)
         self._recolor_all(t, start_widget=win)
 
     def _load_theme_preference(self):

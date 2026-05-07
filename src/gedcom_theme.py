@@ -61,6 +61,16 @@ class Tooltip:
         y = self._widget.winfo_rooty() + self._widget.winfo_height() + 4
         self._tip = tk.Toplevel(self._widget)
         self._tip.wm_overrideredirect(True)
+        if sys.platform == 'darwin':
+            # wm_overrideredirect windows are clipped by macOS compositing;
+            # the 'help' window style renders corners correctly.
+            try:
+                self._tip.tk.call(
+                    'tk::unsupported::MacWindowStyle', 'style',
+                    self._tip._w, 'help', 'noActivates',
+                )
+            except tk.TclError:
+                pass
         self._tip.wm_geometry(f'+{x}+{y}')
         tk.Label(
             self._tip, text=self._text, justify='left',
