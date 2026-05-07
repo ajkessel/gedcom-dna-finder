@@ -60,23 +60,26 @@ class Tooltip:
         x = self._widget.winfo_rootx() + 20
         y = self._widget.winfo_rooty() + self._widget.winfo_height() + 4
         self._tip = tk.Toplevel(self._widget)
-        self._tip.wm_overrideredirect(True)
         if sys.platform == 'darwin':
-            # wm_overrideredirect windows are clipped by macOS compositing;
-            # the 'help' window style renders corners correctly.
+            # wm_overrideredirect conflicts with the macOS 'help' window style
+            # and causes corner clipping. The 'help' style already produces an
+            # undecorated floating window, so overrideredirect is not needed.
             try:
                 self._tip.tk.call(
                     'tk::unsupported::MacWindowStyle', 'style',
                     self._tip._w, 'help', 'noActivates',
                 )
             except tk.TclError:
-                pass
+                self._tip.wm_overrideredirect(True)
+        else:
+            self._tip.wm_overrideredirect(True)
         self._tip.wm_geometry(f'+{x}+{y}')
+        self._tip.configure(background='#ffffe0')
         tk.Label(
             self._tip, text=self._text, justify='left',
             background='#ffffe0', relief='solid', borderwidth=1,
             wraplength=360, padx=4, pady=2,
-        ).pack()
+        ).pack(padx=3, pady=3)
 
     def _hide(self, _event=None):
         """Destroy the tooltip window if it is visible."""
